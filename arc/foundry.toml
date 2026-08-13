@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+
+# Arc Testnet — see https://docs.arc.io / PROJECT.md §7.
+# USDC is Arc's native gas token (18 decimals on-chain); Escrow.sol relies
+# on this and accepts stakes as native `msg.value`, not an ERC-20 transfer.
+[rpc_endpoints]
+arc_testnet = "https://rpc.testnet.arc.network"
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -1,0 +1,337 @@
+// Wager — Prisma schema
+// Core entities per PROJECT.md §5. Financial state (balances, escrow) is
+// authoritative on Arc; Transaction here is a synced ledger/read-model for
+// the app, not the source of truth for funds.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & profiles
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Circle User-Controlled Wallet reference (PROJECT.md §7). Wager's own
+  // Prisma `User.id` doubles as Circle's `userId` (Circle lets callers
+  // supply their own id), so no separate `circleUserId` field is needed.
+  // `circleWalletId` is Circle's internal wallet id, required for wallet
+  // API/challenge calls; `arcWalletAddress` is the wallet's onchain
+  // address, used to read balance and verify transactions directly
+  // against Arc RPC. Both are null until the user completes wallet setup.
+  circleWalletId   String? @unique
+  arcWalletAddress String? @unique
+
+  profile Profile?
+
+  predictions Prediction[]
+  positions   Position[]
+  comments    Comment[]
+  likes       Like[]
+  reposts     Repost[]
+  transactions Transaction[]
+
+  notifications       Notification[] @relation("NotificationRecipient")
+  triggeredNotifications Notification[] @relation("NotificationActor")
+
+  following Follow[] @relation("Follower")
+  followers Follow[] @relation("Following")
+
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  username    String   @unique
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  bannerUrl   String?
+  arcAddress  String?  @unique
+  onboardedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([username])
+  @@map("profiles")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  // Self-follow (followerId == followingId) is rejected at the application
+  // layer — Postgres/Prisma has no portable CHECK constraint for this here.
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+// ---------------------------------------------------------------------------
+// Matches & markets (GenLayer-derived)
+// ---------------------------------------------------------------------------
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  POSTPONED
+  SUSPENDED
+  FINISHED
+  ABANDONED
+  CANCELED
+}
+
+model Match {
+  id           String      @id @default(cuid())
+  externalId   String      @unique // source fixture id (GenLayer Fixture Discovery Contract)
+  competition  String
+  homeTeam     String
+  awayTeam     String
+  kickoff      DateTime
+  status       MatchStatus @default(SCHEDULED)
+  homeScore    Int?
+  awayScore    Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  markets Market[]
+
+  @@index([kickoff])
+  @@index([status])
+  @@map("matches")
+}
+
+enum MarketType {
+  MATCH_RESULT
+  BOTH_TEAMS_TO_SCORE
+  OVER_UNDER_2_5
+}
+
+enum MarketStatus {
+  OPEN
+  LOCKED
+  SETTLING
+  SETTLED
+  VOID
+}
+
+model Market {
+  id      String       @id @default(cuid())
+  matchId String
+  match   Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  type    MarketType
+  status  MarketStatus @default(OPEN)
+
+  // Settlement (produced by the GenLayer Settlement Intelligent Contract,
+  // validated server-side before it is trusted).
+  outcome               String?
+  settlementConfidence  Float?
+  settlementSummary     String?
+  settlementTxHash      String?
+  settledAt             DateTime?
+
+  totalSupportAmount  Decimal @default(0) @db.Decimal(18, 6)
+  totalChallengeAmount Decimal @default(0) @db.Decimal(18, 6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  predictions Prediction[]
+  positions   Position[]
+
+  // One canonical market per match and market type.
+  @@unique([matchId, type])
+  @@index([status])
+  @@map("markets")
+}
+
+// ---------------------------------------------------------------------------
+// Predictions (posts) & social graph
+// ---------------------------------------------------------------------------
+
+enum PredictionSide {
+  SUPPORT
+  CHALLENGE
+}
+
+model Prediction {
+  id        String         @id @default(cuid())
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  marketId  String
+  market    Market         @relation(fields: [marketId], references: [id], onDelete: Restrict)
+  side      PredictionSide
+  content   String
+  createdAt DateTime       @default(now())
+  // No `updatedAt` — predictions are immutable by design (PROJECT.md §2).
+
+  position Position?
+
+  comments Comment[]
+  likes    Like[]
+  reposts  Repost[]
+
+  @@index([marketId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("predictions")
+}
+
+enum PositionStatus {
+  OPEN
+  WON
+  LOST
+  VOID
+  CLAIMED
+}
+
+// A user's on-chain-backed stake in a market. Optionally linked to the
+// social Prediction post that surfaced it. Arc is the source of truth for
+// the funds; this row is Wager's read-model + claim bookkeeping.
+model Position {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketId     String
+  market       Market         @relation(fields: [marketId], references: [id], onDelete: Restrict)
+  predictionId String?        @unique
+  prediction   Prediction?    @relation(fields: [predictionId], references: [id], onDelete: SetNull)
+  side         PredictionSide
+  amount       Decimal        @db.Decimal(18, 6)
+  status       PositionStatus @default(OPEN)
+  arcEscrowTxHash String?
+  arcClaimTxHash  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // A user holds at most one position per market — matches Escrow.sol's
+  // on-chain rule that a staker can't hold both sides of the same market.
+  // Additional stakes on an already-open position are amount top-ups,
+  // handled in the API layer, not additional rows.
+  @@unique([userId, marketId])
+  @@index([userId])
+  @@index([marketId])
+  @@map("positions")
+}
+
+model Comment {
+  id           String     @id @default(cuid())
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  predictionId String
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  content      String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([predictionId])
+  @@map("comments")
+}
+
+model Like {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  predictionId String
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, predictionId])
+  @@index([predictionId])
+  @@map("likes")
+}
+
+model Repost {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  predictionId String
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, predictionId])
+  @@index([predictionId])
+  @@map("reposts")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  REPOST
+  FOLLOW
+  ODDS_UPDATE
+  SETTLEMENT
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actorId      String?
+  actor        User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type         NotificationType
+  message      String
+  predictionId String?
+  marketId     String?
+  read         Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Wallet / Arc-synced ledger
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  ESCROW_LOCK
+  ESCROW_RELEASE
+  CLAIM
+  PAYOUT
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TransactionType
+  status    TransactionStatus @default(PENDING)
+  amount    Decimal           @db.Decimal(18, 6)
+  arcTxHash String?           @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("transactions")
+}

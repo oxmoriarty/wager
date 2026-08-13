@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+coverage
+.vercel
+prisma/migrations
+*.tsbuildinfo
+next-env.d.ts
+# arc/ is a separate Foundry (Solidity) project with its own build
+# artifacts (cache/, out/) and vendored dependencies (lib/) — not part of
+# this project's JS/TS formatting.
+arc
