@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Side} from "./Types.sol";
 import {IMarket} from "./IMarket.sol";
+import {IRewards} from "./IRewards.sol";
 
 /// @title Escrow
 /// @notice Custodies USDC staked on Wager prediction markets and pays it
@@ -50,6 +51,11 @@ contract Escrow is Ownable, ReentrancyGuard {
 
     IMarket public immutable market;
 
+    /// @notice Optional payout history recorder. Zero until wired by the
+    /// owner via `setRewards`. If zero, recording is silently skipped —
+    /// backward-compatible with deployments that don't yet have Rewards.
+    IRewards public rewards;
+
     /// marketId => staker => their (single-sided) position in this market.
     mapping(bytes32 => mapping(address => StakeInfo)) public stakes;
 
@@ -60,6 +66,7 @@ contract Escrow is Ownable, ReentrancyGuard {
     event MarketSettled(bytes32 indexed marketId, Side winningSide, uint256 finalSupportTotal, uint256 finalChallengeTotal);
     event MarketVoided(bytes32 indexed marketId);
     event Claimed(bytes32 indexed marketId, address indexed staker, uint256 payout);
+    event RewardsSet(address indexed rewards);
 
     error ZeroStake();
     error MarketClosed(bytes32 marketId);
@@ -71,9 +78,20 @@ contract Escrow is Ownable, ReentrancyGuard {
     error MarketNotSettled(bytes32 marketId);
     error LosingPosition(bytes32 marketId);
     error TransferFailed();
+    error RewardsAlreadySet();
 
     constructor(address initialOwner, address marketAddress) Ownable(initialOwner) {
         market = IMarket(marketAddress);
+    }
+
+    /// @notice One-time wiring of the Rewards history contract. Owner-only.
+    /// If Rewards is not set, `claim` still works — history recording is
+    /// simply skipped. This means Rewards can be added to an existing
+    /// deployment without breaking anything in flight.
+    function setRewards(address rewardsAddress) external onlyOwner {
+        if (address(rewards) != address(0)) revert RewardsAlreadySet();
+        rewards = IRewards(rewardsAddress);
+        emit RewardsSet(rewardsAddress);
     }
 
     /// @notice Stakes native USDC (`msg.value`) on one side of a market.
@@ -163,5 +181,16 @@ contract Escrow is Ownable, ReentrancyGuard {
         if (!success) revert TransferFailed();
 
         emit Claimed(marketId, msg.sender, payout);
+
+        // Record the payout in the Rewards history ledger if one is set.
+        // Wrapped in try/catch: funds are already transferred at this point,
+        // so a Rewards failure must never revert and trap the staker's payout.
+        if (address(rewards) != address(0)) {
+            try rewards.recordClaim(marketId, msg.sender, payout) {}
+            catch {
+                // Rewards recording failed — emit nothing extra; the on-chain
+                // `Claimed` event above is the authoritative payout record.
+            }
+        }
     }
 }

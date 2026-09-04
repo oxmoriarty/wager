@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Side} from "./Types.sol";
+import {IMarket} from "./IMarket.sol";
 
 /// @title Market
 /// @notice On-chain registry for Wager's canonical prediction markets.
@@ -16,7 +17,7 @@ import {Side} from "./Types.sol";
 /// `marketId` is `keccak256(utf8(<Wager Prisma Market.id>))` — see
 /// `src/lib/arc/market-id.ts` on the backend for the canonical derivation.
 /// The chain never sees Wager's cuid-format Market ids directly.
-contract Market is Ownable {
+contract Market is Ownable, IMarket {
     struct MarketInfo {
         uint256 supportTotal;
         uint256 challengeTotal;
