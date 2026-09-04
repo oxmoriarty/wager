@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiError, apiSuccess } from "@/lib/api-response";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 import { syncFixturesFromGenLayer } from "@/lib/genlayer/sync-fixtures";
 
 const syncRequestSchema = z.object({
@@ -19,6 +20,10 @@ const syncRequestSchema = z.object({
  * this route in any user-facing UI.
  */
 export async function POST(request: Request) {
+  if (!isAdminAuthorized(request)) {
+    return apiError("Unauthorized.", 401, "UNAUTHORIZED");
+  }
+
   let body: unknown;
   try {
     body = await request.json();

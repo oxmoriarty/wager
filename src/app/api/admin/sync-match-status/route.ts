@@ -1,4 +1,5 @@
 import { apiError, apiSuccess } from "@/lib/api-response";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 import { syncMatchStatusesFromGenLayer } from "@/lib/genlayer/sync-match-status";
 
 /**
@@ -7,7 +8,11 @@ import { syncMatchStatusesFromGenLayer } from "@/lib/genlayer/sync-match-status"
  * — same access-control caveat applies here (intended for a scheduled
  * job, not a user-facing endpoint).
  */
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isAdminAuthorized(request)) {
+    return apiError("Unauthorized.", 401, "UNAUTHORIZED");
+  }
+
   try {
     const result = await syncMatchStatusesFromGenLayer();
     return apiSuccess(result, "Match statuses synced.");
