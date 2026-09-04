@@ -132,3 +132,37 @@ export async function getPositionsForUser(
     amount: position.amount.toString(),
   }));
 }
+
+// -----------------------------------------------------------------------
+// Reward stats (DB-sourced — updated atomically in claim-confirm)
+// -----------------------------------------------------------------------
+
+export interface RewardsStats {
+  totalClaimed: string;
+  claimCount: number;
+}
+
+/**
+ * Aggregates the user's confirmed claim transactions from the DB.
+ * This data was verified on-chain before being written (see
+ * `src/app/api/wallet/claim-confirm/route.ts`), so it's a reliable
+ * cache of the on-chain Rewards contract state.
+ */
+export async function getRewardsStats(
+  userId: string,
+): Promise<RewardsStats> {
+  const result = await prisma.transaction.aggregate({
+    where: {
+      userId,
+      type: "CLAIM",
+      status: "CONFIRMED",
+    },
+    _sum: { amount: true },
+    _count: true,
+  });
+
+  return {
+    totalClaimed: (result._sum.amount ?? 0).toString(),
+    claimCount: result._count,
+  };
+}

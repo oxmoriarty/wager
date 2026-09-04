@@ -78,3 +78,14 @@ export function getEscrowContractAddress(): Address {
   }
   return address as Address;
 }
+
+export function getRewardsContractAddress(): Address {
+  const address = process.env.ARC_REWARDS_CONTRACT_ADDRESS;
+  if (!address) {
+    throw new Error(
+      "ARC_REWARDS_CONTRACT_ADDRESS is not set. Deploy arc/src/Rewards.sol " +
+        "to Arc Testnet first (see arc/README.md).",
+    );
+  }
+  return address as Address;
+}

@@ -4,13 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatUsdcAmount } from "@/lib/format";
 import { useWalletSetup } from "@/lib/circle/use-wallet-setup";
-import type { WalletOverview } from "@/lib/queries/wallet";
+import type { RewardsStats, WalletOverview } from "@/lib/queries/wallet";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-export function WalletCard({ overview }: { overview: WalletOverview }) {
+interface WalletCardProps {
+  overview: WalletOverview;
+  rewardsStats: RewardsStats;
+}
+
+export function WalletCard({ overview, rewardsStats }: WalletCardProps) {
   const { isSettingUp, setupWallet } = useWalletSetup();
 
   if (!overview.hasWallet || !overview.arcWalletAddress) {
@@ -53,6 +58,17 @@ export function WalletCard({ overview }: { overview: WalletOverview }) {
         {formatUsdcAmount(overview.balance ?? "0")} USDC
       </p>
 
+      {rewardsStats.claimCount > 0 && (
+        <div className="flex items-center justify-between border-t pt-2">
+          <p className="text-muted-foreground text-xs tracking-wide uppercase">
+            Total claimed
+          </p>
+          <p className="text-foreground text-sm font-semibold tabular-nums">
+            {formatUsdcAmount(rewardsStats.totalClaimed)} USDC
+          </p>
+        </div>
+      )}
+
       <p className="text-muted-foreground text-xs">
         Testnet USDC has no real value.{" "}
         <a
@@ -68,3 +84,4 @@ export function WalletCard({ overview }: { overview: WalletOverview }) {
     </Card>
   );
 }
+

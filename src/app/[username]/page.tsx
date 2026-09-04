@@ -116,6 +116,18 @@ export default async function ProfilePage({
             <ProfileStat label="Following" value={profile.followingCount} />
           </CardContent>
 
+          <CardContent className="w-full flex-row items-center justify-center gap-8 border-t p-0 pt-2">
+            <ProfileStat label="Wins" value={profile.totalWins} />
+            <ProfileStat
+              label="Win Rate"
+              value={`${Math.round(profile.winRate * 100)}%`}
+            />
+            <ProfileStat
+              label="Claimed"
+              value={`$${Number(profile.totalClaimed).toFixed(2)}`}
+            />
+          </CardContent>
+
           {!isOwnProfile && (
             <FollowButton
               username={profile.username}

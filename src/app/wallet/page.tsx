@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   getPositionsForUser,
+  getRewardsStats,
   getTransactionsPage,
   getWalletOverview,
 } from "@/lib/queries/wallet";
@@ -20,11 +21,13 @@ export default async function WalletPage() {
     redirect("/sign-in");
   }
 
-  const [overview, positions, transactionsPage] = await Promise.all([
-    getWalletOverview(session.user.id),
-    getPositionsForUser(session.user.id),
-    getTransactionsPage(session.user.id),
-  ]);
+  const [overview, positions, transactionsPage, rewardsStats] =
+    await Promise.all([
+      getWalletOverview(session.user.id),
+      getPositionsForUser(session.user.id),
+      getTransactionsPage(session.user.id),
+      getRewardsStats(session.user.id),
+    ]);
 
   return (
     <>
@@ -32,7 +35,7 @@ export default async function WalletPage() {
       <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-8 sm:px-6">
         <h1 className="text-foreground text-lg font-semibold">Wallet</h1>
 
-        <WalletCard overview={overview} />
+        <WalletCard overview={overview} rewardsStats={rewardsStats} />
 
         <div className="flex flex-col gap-3">
           <h2 className="text-foreground text-sm font-semibold tracking-wide uppercase">
