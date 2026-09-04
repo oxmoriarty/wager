@@ -23,3 +23,11 @@ export const stakeConfirmSchema = z.object({
   side: stakeSideSchema,
   amount: usdcAmountSchema,
 });
+
+export const claimChallengeSchema = z.object({
+  marketId: z.string().min(1),
+});
+
+export const claimConfirmSchema = z.object({
+  marketId: z.string().min(1),
+});

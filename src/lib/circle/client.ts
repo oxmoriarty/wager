@@ -194,3 +194,70 @@ export async function findStakeTransactionHash(params: {
 
   return null;
 }
+
+/**
+ * Starts a challenge to call `Escrow.claim(marketId)`. Unlike staking,
+ * claiming doesn't send value — the Escrow contract sends the payout
+ * back to the caller.
+ */
+export async function createClaimChallenge(params: {
+  userId: string;
+  walletId: string;
+  onChainMarketId: Hex;
+}): Promise<{ challengeId: string }> {
+  const result =
+    await getCircleClient().createUserTransactionContractExecutionChallenge({
+      userId: params.userId,
+      walletId: params.walletId,
+      contractAddress: getEscrowContractAddress(),
+      abiFunctionSignature: "claim(bytes32)",
+      abiParameters: [params.onChainMarketId],
+      amount: "0",
+      fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+    });
+
+  const challengeId = result.data?.challengeId;
+  if (!challengeId) {
+    throw new Error(
+      "Circle did not return a challengeId for the claim transaction.",
+    );
+  }
+
+  return { challengeId };
+}
+
+/**
+ * Locates the transaction hash for a claim the user just completed.
+ * Same locate-then-verify pattern as `findStakeTransactionHash`.
+ */
+export async function findClaimTransactionHash(params: {
+  userId: string;
+  walletId: string;
+  onChainMarketId: Hex;
+}): Promise<string | null> {
+  const result = await getCircleClient().listTransactions({
+    userId: params.userId,
+    walletIds: [params.walletId],
+    destinationAddress: getEscrowContractAddress(),
+    order: "DESC",
+  });
+
+  const transactions = result.data?.transactions ?? [];
+
+  for (const tx of transactions) {
+    if (!tx.txHash) continue;
+    if (tx.state !== "CONFIRMED" && tx.state !== "COMPLETE") continue;
+    if (tx.abiFunctionSignature !== "claim(bytes32)") continue;
+
+    const [marketIdParam] = tx.abiParameters ?? [];
+    const matchesMarket =
+      typeof marketIdParam === "string" &&
+      marketIdParam.toLowerCase() === params.onChainMarketId.toLowerCase();
+
+    if (matchesMarket) {
+      return tx.txHash;
+    }
+  }
+
+  return null;
+}

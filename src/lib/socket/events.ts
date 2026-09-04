@@ -70,6 +70,12 @@ export interface SettlementCompletedPayload {
   settledAt: string;
 }
 
+export interface ClaimCompletedPayload {
+  marketId: string;
+  userId: string;
+  payout: string;
+}
+
 export interface NotificationCreatedPayload {
   notificationId: string;
   userId: string;
@@ -89,6 +95,7 @@ export interface ServerToClientEvents {
   liquidity_updated: (payload: LiquidityUpdatedPayload) => void;
   score_updated: (payload: ScoreUpdatedPayload) => void;
   settlement_completed: (payload: SettlementCompletedPayload) => void;
+  claim_completed: (payload: ClaimCompletedPayload) => void;
   notification_created: (payload: NotificationCreatedPayload) => void;
 }
 

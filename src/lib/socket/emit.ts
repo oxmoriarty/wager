@@ -2,6 +2,7 @@ import { getSocketServer } from "./server";
 import { rooms } from "./events";
 import type {
   CommentAddedPayload,
+  ClaimCompletedPayload,
   FeedUpdatePayload,
   FollowAddedPayload,
   LikeAddedPayload,
@@ -80,4 +81,15 @@ export function emitSettlementCompleted(payload: SettlementCompletedPayload) {
   const io = getSocketServer();
   if (!io) return;
   io.to(rooms.market(payload.marketId)).emit("settlement_completed", payload);
+}
+
+/**
+ * Fired when a user successfully claims their payout/refund from a
+ * settled or voided market. Emitted to the user's private room so
+ * their wallet page can update in real time.
+ */
+export function emitClaimCompleted(payload: ClaimCompletedPayload) {
+  const io = getSocketServer();
+  if (!io) return;
+  io.to(rooms.user(payload.userId)).emit("claim_completed", payload);
 }

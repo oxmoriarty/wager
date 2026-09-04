@@ -57,7 +57,7 @@ export async function POST(
   }
 
   try {
-    const comment = await prisma.comment.create({
+    const commentRaw = await prisma.comment.create({
       data: {
         authorId: session.user.id,
         predictionId: prediction.id,
@@ -68,10 +68,27 @@ export async function POST(
         content: true,
         createdAt: true,
         author: {
-          select: { username: true, displayName: true, avatarUrl: true },
+          select: {
+            profile: {
+              select: { username: true, displayName: true, avatarUrl: true },
+            },
+          },
         },
       },
     });
+
+    // Flatten profile fields up to author level — mirrors the pattern in
+    // `src/lib/queries/comments.ts` so the shape is consistent.
+    const comment = {
+      id: commentRaw.id,
+      content: commentRaw.content,
+      createdAt: commentRaw.createdAt,
+      author: {
+        username: commentRaw.author.profile?.username ?? "",
+        displayName: commentRaw.author.profile?.displayName ?? "",
+        avatarUrl: commentRaw.author.profile?.avatarUrl ?? null,
+      },
+    };
 
     emitCommentAdded({
       predictionId: prediction.id,
