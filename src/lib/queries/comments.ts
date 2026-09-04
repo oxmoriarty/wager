@@ -8,13 +8,25 @@ const commentSelect = {
   content: true,
   createdAt: true,
   author: {
-    select: { username: true, displayName: true, avatarUrl: true },
+    select: {
+      profile: {
+        select: { username: true, displayName: true, avatarUrl: true },
+      },
+    },
   },
 } satisfies Prisma.CommentSelect;
 
-export type CommentRow = Prisma.CommentGetPayload<{
+type RawCommentRow = Prisma.CommentGetPayload<{
   select: typeof commentSelect;
 }>;
+
+export type CommentRow = Omit<RawCommentRow, "author"> & {
+  author: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+};
 
 export async function getCommentsPage(predictionId: string, cursor?: string) {
   const comments = await prisma.comment.findMany({
@@ -26,7 +38,16 @@ export async function getCommentsPage(predictionId: string, cursor?: string) {
   });
 
   const hasMore = comments.length > COMMENTS_PAGE_SIZE;
-  const items = hasMore ? comments.slice(0, COMMENTS_PAGE_SIZE) : comments;
+  const items = (hasMore ? comments.slice(0, COMMENTS_PAGE_SIZE) : comments).map(
+    (c) => ({
+      ...c,
+      author: {
+        username: c.author.profile?.username ?? "",
+        displayName: c.author.profile?.displayName ?? "",
+        avatarUrl: c.author.profile?.avatarUrl ?? null,
+      },
+    }),
+  );
 
   return {
     items,

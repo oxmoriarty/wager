@@ -10,7 +10,11 @@ const marketPredictionSelect = {
   side: true,
   createdAt: true,
   author: {
-    select: { username: true, displayName: true, avatarUrl: true },
+    select: {
+      profile: {
+        select: { username: true, displayName: true, avatarUrl: true },
+      },
+    },
   },
 } satisfies Prisma.PredictionSelect;
 
@@ -51,6 +55,17 @@ const matchSelect = {
 
 type RawMatch = Prisma.MatchGetPayload<{ select: typeof matchSelect }>;
 type RawMarket = RawMatch["markets"][number];
+type RawMarketPrediction = RawMarket["predictions"][number];
+
+type FlatAuthor = {
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+
+export type MarketPredictionDetail = Omit<RawMarketPrediction, "author"> & {
+  author: FlatAuthor;
+};
 
 /** The viewer's own stake on a market, if any — mirrors `feed.ts`'s
  * `isLikedByViewer` pattern: computed separately from the main query
@@ -70,11 +85,12 @@ export interface ViewerPosition {
  * `Position`/`Transaction` amounts will need once those are read anywhere. */
 export type MarketDetail = Omit<
   RawMarket,
-  "totalSupportAmount" | "totalChallengeAmount"
+  "totalSupportAmount" | "totalChallengeAmount" | "predictions"
 > & {
   totalSupportAmount: string;
   totalChallengeAmount: string;
   viewerPosition: ViewerPosition | null;
+  predictions: MarketPredictionDetail[];
 };
 
 export type MatchDetail = Omit<RawMatch, "markets"> & {
@@ -121,6 +137,14 @@ export async function getMatchById(
               status: viewerPosition.status,
             }
           : null,
+        predictions: market.predictions.map((p) => ({
+          ...p,
+          author: {
+            username: p.author.profile?.username ?? "",
+            displayName: p.author.profile?.displayName ?? "",
+            avatarUrl: p.author.profile?.avatarUrl ?? null,
+          },
+        })),
       };
     }),
   };

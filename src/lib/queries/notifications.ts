@@ -11,13 +11,25 @@ const notificationSelect = {
   predictionId: true,
   createdAt: true,
   actor: {
-    select: { username: true, displayName: true, avatarUrl: true },
+    select: {
+      profile: {
+        select: { username: true, displayName: true, avatarUrl: true },
+      },
+    },
   },
 } satisfies Prisma.NotificationSelect;
 
-export type NotificationRow = Prisma.NotificationGetPayload<{
+type RawNotificationRow = Prisma.NotificationGetPayload<{
   select: typeof notificationSelect;
 }>;
+
+export type NotificationRow = Omit<RawNotificationRow, "actor"> & {
+  actor: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  } | null;
+};
 
 export async function getNotificationsPage(userId: string, cursor?: string) {
   const notifications = await prisma.notification.findMany({
@@ -29,9 +41,20 @@ export async function getNotificationsPage(userId: string, cursor?: string) {
   });
 
   const hasMore = notifications.length > NOTIFICATIONS_PAGE_SIZE;
-  const items = hasMore
+  const rawItems = hasMore
     ? notifications.slice(0, NOTIFICATIONS_PAGE_SIZE)
     : notifications;
+
+  const items = rawItems.map((n) => ({
+    ...n,
+    actor: n.actor
+      ? {
+          username: n.actor.profile?.username ?? "",
+          displayName: n.actor.profile?.displayName ?? "",
+          avatarUrl: n.actor.profile?.avatarUrl ?? null,
+        }
+      : null,
+  }));
 
   return {
     items,
