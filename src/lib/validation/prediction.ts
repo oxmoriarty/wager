@@ -2,9 +2,7 @@ import { z } from "zod";
 
 export const createPredictionSchema = z.object({
   marketId: z.string().min(1, "Choose a market"),
-  side: z.enum(["SUPPORT", "CHALLENGE"], {
-    message: "Choose Support or Challenge",
-  }),
+  side: z.enum(["SUPPORT", "CHALLENGE"]).optional().nullable(),
   content: z
     .string()
     .trim()

@@ -27,24 +27,34 @@ export async function POST(
     return apiError("Prediction not found.", 404, "NOT_FOUND");
   }
 
+  const existing = await prisma.repost.findUnique({
+    where: {
+      userId_predictionId: {
+        userId: session.user.id,
+        predictionId: prediction.id,
+      },
+    },
+  });
+
+  if (existing) {
+    return apiError(
+      "You have already reposted this prediction. Undo your repost first to repost again.",
+      409,
+      "ALREADY_REPOSTED",
+    );
+  }
+
   try {
     await prisma.repost.create({
       data: { userId: session.user.id, predictionId: prediction.id },
     });
   } catch (error) {
-    // Already reposted — idempotent no-op, not an error.
-    const alreadyReposted =
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002";
-
-    if (!alreadyReposted) {
-      console.error("Repost failed:", error);
-      return apiError(
-        "Something went wrong. Please try again.",
-        500,
-        "INTERNAL_ERROR",
-      );
-    }
+    console.error("Repost failed:", error);
+    return apiError(
+      "Something went wrong. Please try again.",
+      500,
+      "INTERNAL_ERROR",
+    );
   }
 
   const repostCount = await prisma.repost.count({

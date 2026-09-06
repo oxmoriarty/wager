@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/format";
 import type { NotificationRow } from "@/lib/queries/notifications";
-import type { ApiSuccess } from "@/lib/api-response";
+import type { ApiError, ApiSuccess } from "@/lib/api-response";
 
 interface NotificationsPage {
   items: NotificationRow[];
@@ -28,15 +29,58 @@ function initials(name: string) {
 
 function notificationHref(notification: NotificationRow) {
   if (notification.predictionId) {
-    // Any username segment works here — the prediction detail page
-    // canonicalizes to the real author's username if this one doesn't
-    // match, so using the actor's username as the entry point is safe.
     return `/${notification.actor?.username}/${notification.predictionId}`;
   }
   if (notification.actor) {
     return `/${notification.actor.username}`;
   }
   return "/notifications";
+}
+
+// Inline "Follow Back" button for FOLLOW notifications
+function FollowBackButton({
+  username,
+  initialIsFollowingBack,
+}: {
+  username: string;
+  initialIsFollowingBack: boolean;
+}) {
+  const [isFollowing, setIsFollowing] = useState(initialIsFollowingBack);
+  const [isPending, setIsPending] = useState(false);
+
+  async function handleClick(e: React.MouseEvent) {
+    e.preventDefault(); // don't navigate
+    e.stopPropagation();
+    if (isFollowing) return;
+    setIsPending(true);
+    try {
+      const res = await fetch(`/api/users/${username}/follow`, {
+        method: "POST",
+      });
+      const body = (await res.json()) as ApiSuccess<{ following: boolean }> | ApiError;
+      if (body.success) {
+        setIsFollowing(true);
+      } else {
+        toast.error(body.message);
+      }
+    } catch {
+      toast.error("Something went wrong.");
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant={isFollowing ? "outline" : "default"}
+      onClick={handleClick}
+      disabled={isPending || isFollowing}
+      className="shrink-0 text-xs h-7 px-2.5"
+    >
+      {isPending ? "…" : isFollowing ? "Following" : "Follow Back"}
+    </Button>
+  );
 }
 
 export function NotificationsList({
@@ -58,7 +102,7 @@ export function NotificationsList({
     try {
       await fetch(`/api/notifications/${id}/read`, { method: "POST" });
     } catch {
-      // Non-critical — worst case the item shows as unread until next load.
+      // Non-critical
     }
   }
 
@@ -140,6 +184,15 @@ export function NotificationsList({
                 {formatRelativeTime(notification.createdAt)}
               </span>
             </div>
+
+            {/* Follow-back CTA for FOLLOW notifications */}
+            {notification.type === "FOLLOW" && notification.actor?.username && (
+              <FollowBackButton
+                username={notification.actor.username}
+                initialIsFollowingBack={notification.isFollowingBack}
+              />
+            )}
+
             {!notification.read && (
               <span className="bg-primary size-2 shrink-0 rounded-full" />
             )}
@@ -160,3 +213,4 @@ export function NotificationsList({
     </div>
   );
 }
+

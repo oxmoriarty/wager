@@ -57,11 +57,13 @@ export function PredictionCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge
-              variant={prediction.side === "SUPPORT" ? "success" : "warning"}
-            >
-              {prediction.side === "SUPPORT" ? "Supporting" : "Challenging"}
-            </Badge>
+            {prediction.side && (
+              <Badge
+                variant={prediction.side === "SUPPORT" ? "success" : "warning"}
+              >
+                {prediction.side === "SUPPORT" ? "Supporting" : "Challenging"}
+              </Badge>
+            )}
             <Link
               href={`/matches/${market.match.id}`}
               className="text-muted-foreground hover:text-foreground hover:underline"

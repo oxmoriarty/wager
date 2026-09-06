@@ -5,6 +5,7 @@ import {
   createCircleUserToken,
   createWalletSetupChallenge,
   ensureCircleUser,
+  getArcWallet,
 } from "@/lib/circle/client";
 
 /**
@@ -44,7 +45,50 @@ export async function POST() {
       });
     }
 
-    const { challengeId } = await createWalletSetupChallenge(userId);
+    // Check if Circle already has the wallet created (e.g. user finished PIN setup)
+    const existingWallet = await getArcWallet(userId);
+    if (existingWallet) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          circleWalletId: existingWallet.walletId,
+          arcWalletAddress: existingWallet.address,
+        },
+      });
+
+      return apiSuccess({
+        hasWallet: true,
+        arcWalletAddress: existingWallet.address,
+        userToken,
+        encryptionKey,
+      });
+    }
+
+    let challengeId: string;
+    try {
+      const challenge = await createWalletSetupChallenge(userId);
+      challengeId = challenge.challengeId;
+    } catch (setupError) {
+      // If setup challenge fails (e.g. user already has PIN/wallet in Circle),
+      // re-check for existing wallet before failing.
+      const retryWallet = await getArcWallet(userId);
+      if (retryWallet) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            circleWalletId: retryWallet.walletId,
+            arcWalletAddress: retryWallet.address,
+          },
+        });
+        return apiSuccess({
+          hasWallet: true,
+          arcWalletAddress: retryWallet.address,
+          userToken,
+          encryptionKey,
+        });
+      }
+      throw setupError;
+    }
 
     return apiSuccess({
       hasWallet: false,

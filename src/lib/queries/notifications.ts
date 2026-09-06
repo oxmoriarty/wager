@@ -9,6 +9,7 @@ const notificationSelect = {
   message: true,
   read: true,
   predictionId: true,
+  actorId: true,
   createdAt: true,
   actor: {
     select: {
@@ -24,6 +25,7 @@ type RawNotificationRow = Prisma.NotificationGetPayload<{
 }>;
 
 export type NotificationRow = Omit<RawNotificationRow, "actor"> & {
+  isFollowingBack: boolean;
   actor: {
     username: string;
     displayName: string;
@@ -45,8 +47,26 @@ export async function getNotificationsPage(userId: string, cursor?: string) {
     ? notifications.slice(0, NOTIFICATIONS_PAGE_SIZE)
     : notifications;
 
+  const followActorIds = rawItems
+    .filter((n) => n.type === "FOLLOW" && n.actorId)
+    .map((n) => n.actorId as string);
+
+  const viewerFollows =
+    followActorIds.length > 0
+      ? await prisma.follow.findMany({
+          where: {
+            followerId: userId,
+            followingId: { in: followActorIds },
+          },
+          select: { followingId: true },
+        })
+      : [];
+
+  const followedSet = new Set(viewerFollows.map((f) => f.followingId));
+
   const items = rawItems.map((n) => ({
     ...n,
+    isFollowingBack: n.actorId ? followedSet.has(n.actorId) : false,
     actor: n.actor
       ? {
           username: n.actor.profile?.username ?? "",

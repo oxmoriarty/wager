@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { getPredictionById } from "@/lib/queries/feed";
 import { getCommentsPage } from "@/lib/queries/comments";
+import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PredictionCard } from "@/components/feed/prediction-card";
 import { CommentComposer } from "@/components/feed/comment-composer";
@@ -50,6 +52,13 @@ export default async function PredictionDetailPage({
     <>
       <AppHeader />
       <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 py-8 sm:px-6">
+        <Link
+          href="/"
+          className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-xs transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to feed
+        </Link>
         <PredictionCard
           prediction={prediction}
           isAuthenticated={Boolean(session?.user)}
@@ -58,7 +67,11 @@ export default async function PredictionDetailPage({
           predictionId={predictionId}
           isAuthenticated={Boolean(session?.user)}
         />
-        <CommentList predictionId={predictionId} initialPage={commentsPage} />
+        <CommentList
+          predictionId={predictionId}
+          initialPage={commentsPage}
+          isAuthenticated={Boolean(session?.user)}
+        />
       </main>
     </>
   );

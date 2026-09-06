@@ -61,9 +61,20 @@ export function useWalletSetup() {
         const confirmResponse = await fetch("/api/wallet/setup-confirm", {
           method: "POST",
         });
-        const confirmBody = await parseApiResponse<{
+        let confirmBody = await parseApiResponse<{
           arcWalletAddress: string;
         }>(confirmResponse);
+
+        if (!confirmBody.success && confirmResponse.status === 409) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const retryResponse = await fetch("/api/wallet/setup-confirm", {
+            method: "POST",
+          });
+          confirmBody = await parseApiResponse<{
+            arcWalletAddress: string;
+          }>(retryResponse);
+        }
+
         if (!confirmBody.success) {
           toast.error(confirmBody.message);
           return false;

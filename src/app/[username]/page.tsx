@@ -60,7 +60,7 @@ export default async function ProfilePage({
   const session = await auth();
   const isOwnProfile = session?.user?.id === profile.userId;
 
-  const [isFollowing, predictions] = await Promise.all([
+  const [isFollowing, isFollowingBack, predictions] = await Promise.all([
     session?.user?.id
       ? prisma.follow
           .findUnique({
@@ -68,6 +68,20 @@ export default async function ProfilePage({
               followerId_followingId: {
                 followerId: session.user.id,
                 followingId: profile.userId,
+              },
+            },
+            select: { id: true },
+          })
+          .then(Boolean)
+      : Promise.resolve(false),
+    // Does the profile owner follow the viewer back?
+    session?.user?.id
+      ? prisma.follow
+          .findUnique({
+            where: {
+              followerId_followingId: {
+                followerId: profile.userId,
+                followingId: session.user.id,
               },
             },
             select: { id: true },
@@ -133,6 +147,7 @@ export default async function ProfilePage({
               username={profile.username}
               isAuthenticated={Boolean(session?.user)}
               initialIsFollowing={isFollowing}
+              initialIsFollowingBack={isFollowingBack}
             />
           )}
         </Card>

@@ -39,7 +39,7 @@ model User {
 
   predictions Prediction[]
   positions   Position[]
-  comments    Comment[]
+  comments    Comment[]   @relation("CommentAuthor")
   likes       Like[]
   reposts     Repost[]
   transactions Transaction[]
@@ -179,7 +179,7 @@ model Prediction {
   author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
   marketId  String
   market    Market         @relation(fields: [marketId], references: [id], onDelete: Restrict)
-  side      PredictionSide
+  side      PredictionSide?
   content   String
   createdAt DateTime       @default(now())
   // No `updatedAt` — predictions are immutable by design (PROJECT.md §2).
@@ -236,14 +236,20 @@ model Position {
 model Comment {
   id           String     @id @default(cuid())
   authorId     String
-  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author       User       @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   predictionId String
   prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
   content      String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
+  // Threading: null = top-level comment; set = reply to a comment
+  parentId     String?
+  parent       Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      Comment[]  @relation("CommentReplies")
+
   @@index([predictionId])
+  @@index([parentId])
   @@map("comments")
 }
 

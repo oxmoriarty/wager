@@ -44,12 +44,27 @@ export async function POST(request: Request) {
     );
   }
 
+  // If entering a side, user must have an Arc wallet
+  if (side) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { arcWalletAddress: true },
+    });
+    if (!user?.arcWalletAddress) {
+      return apiError(
+        "You must set up your wallet before choosing Support or Challenge.",
+        400,
+        "WALLET_REQUIRED",
+      );
+    }
+  }
+
   try {
     const prediction = await prisma.prediction.create({
       data: {
         authorId: session.user.id,
         marketId,
-        side,
+        side: side ?? null,
         content,
       },
       select: { id: true },

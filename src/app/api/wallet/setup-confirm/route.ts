@@ -19,7 +19,15 @@ export async function POST() {
   const userId = session.user.id;
 
   try {
-    const wallet = await getArcWallet(userId);
+    let wallet = await getArcWallet(userId);
+    if (!wallet) {
+      for (let i = 0; i < 3; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        wallet = await getArcWallet(userId);
+        if (wallet) break;
+      }
+    }
+
     if (!wallet) {
       return apiError(
         "No Arc wallet found yet — wallet creation may still be processing. Please try again in a moment.",

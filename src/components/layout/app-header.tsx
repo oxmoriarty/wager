@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Search, Wallet } from "lucide-react";
+import { PenLine, Search, Wallet } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 
@@ -65,6 +66,12 @@ export async function AppHeader() {
 
       {profile ? (
         <div className="flex items-center gap-3">
+          <Button asChild size="sm" className="h-8 gap-1.5 px-3 text-xs">
+            <Link href="/?compose=true">
+              <PenLine className="size-3.5" />
+              <span>Predict</span>
+            </Link>
+          </Button>
           <SearchLink />
           <WalletLink />
           <NotificationBell initialUnreadCount={unreadCount} />

@@ -56,17 +56,34 @@ export async function POST(
     );
   }
 
+  let targetParentId: string | null = null;
+
+  // Validate parentId belongs to this prediction (prevent cross-post replies)
+  if (parsed.data.parentId) {
+    const parent = await prisma.comment.findUnique({
+      where: { id: parsed.data.parentId },
+      select: { id: true, predictionId: true, parentId: true, authorId: true },
+    });
+    if (!parent || parent.predictionId !== prediction.id) {
+      return apiError("Parent comment not found.", 404, "NOT_FOUND");
+    }
+    // Flatten to 1 level thread: if the target is already a reply, attach to its root
+    targetParentId = parent.parentId ?? parent.id;
+  }
+
   try {
     const commentRaw = await prisma.comment.create({
       data: {
         authorId: session.user.id,
         predictionId: prediction.id,
         content: parsed.data.content,
+        ...(targetParentId ? { parentId: targetParentId } : {}),
       },
       select: {
         id: true,
         content: true,
         createdAt: true,
+        parentId: true,
         author: {
           select: {
             profile: {
@@ -77,12 +94,11 @@ export async function POST(
       },
     });
 
-    // Flatten profile fields up to author level — mirrors the pattern in
-    // `src/lib/queries/comments.ts` so the shape is consistent.
     const comment = {
       id: commentRaw.id,
       content: commentRaw.content,
       createdAt: commentRaw.createdAt,
+      parentId: commentRaw.parentId,
       author: {
         username: commentRaw.author.profile?.username ?? "",
         displayName: commentRaw.author.profile?.displayName ?? "",
@@ -98,7 +114,34 @@ export async function POST(
       createdAt: comment.createdAt.toISOString(),
     });
 
-    if (prediction.authorId !== session.user.id) {
+    // Notify appropriate user
+    if (parsed.data.parentId) {
+      // Replying to a comment: notify the comment author
+      const parentComment = await prisma.comment.findUnique({
+        where: { id: parsed.data.parentId },
+        select: { authorId: true },
+      });
+      if (parentComment && parentComment.authorId !== session.user.id) {
+        const notification = await prisma.notification.create({
+          data: {
+            userId: parentComment.authorId,
+            actorId: session.user.id,
+            type: "COMMENT",
+            predictionId: prediction.id,
+            message: `${comment.author.displayName} replied to your comment.`,
+          },
+        });
+
+        emitNotificationCreated({
+          notificationId: notification.id,
+          userId: parentComment.authorId,
+          type: notification.type,
+          message: notification.message,
+          createdAt: notification.createdAt.toISOString(),
+        });
+      }
+    } else if (prediction.authorId !== session.user.id) {
+      // Top-level comment: notify the prediction author
       const notification = await prisma.notification.create({
         data: {
           userId: prediction.authorId,
@@ -128,3 +171,4 @@ export async function POST(
     );
   }
 }
+
