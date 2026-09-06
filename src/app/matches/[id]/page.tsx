@@ -31,22 +31,21 @@ export default async function MatchDetailPage({
 }) {
   const { id } = await params;
   const session = await auth();
-  const match = await getMatchById(id, session?.user?.id);
+  const [match, userWithWallet] = await Promise.all([
+    getMatchById(id, session?.user?.id),
+    session?.user
+      ? prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { arcWalletAddress: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   if (!match) {
     notFound();
   }
 
-  const hasWallet = session?.user
-    ? Boolean(
-        (
-          await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { arcWalletAddress: true },
-          })
-        )?.arcWalletAddress,
-      )
-    : false;
+  const hasWallet = Boolean(userWithWallet?.arcWalletAddress);
 
   return (
     <>

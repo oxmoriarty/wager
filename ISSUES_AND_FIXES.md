@@ -345,6 +345,31 @@ This document provides a comprehensive technical log of all bugs, architecture c
 
 ---
 
+## 16. Instant Page Navigation, Request Deduplication & High-Visibility Comment Branch Controls
+
+### Issue
+- Navigating between pages exhibited noticeable latency before rendering destination views, with no visual loading feedback when buttons or links were clicked.
+- Database queries across metadata generation (`generateMetadata`) and page components (`PredictionDetailPage`, `ProfilePage`, `MatchDetailPage`, `AppHeader`) were executed sequentially and redundantly, doubling round trips to Supabase over PostgreSQL connection pooling.
+- The button to expand nested comment replies (e.g. `3 more replies`) was styled in dark primary blue (`text-primary`), making it barely legible against dark backgrounds.
+
+### Resolution
+- **Global Navigation Progress Bar (`NavigationProgress`)**:
+  - Built a zero-latency client-side navigation progress component in `src/components/layout/navigation-progress.tsx` placed globally in `RootLayout`.
+  - Intercepts clicks on internal links and starts an immediate (0ms) glowing top progress bar that animates from 0% -> 80% and finishes cleanly at 100% upon page transition.
+- **RSC Prefetching**:
+  - Added `prefetch={true}` across all primary navigation links in `AppHeader` (Home, Predict, Search, Wallet, Notifications, Profile, Sign in, Sign up) and `PredictionCard` (post details, authors, matches), pre-caching route payloads directly in client memory for instant page transitions on click.
+- **Request Deduplication with React `cache()`**:
+  - Wrapped `getPredictionById`, `getProfileByUsername`, `getMatchById`, `getUnreadNotificationCount`, and header profile queries in React's `cache()`.
+  - Calling queries in `generateMetadata` and Server Components in the same request now shares identical cached results with 0ms overhead, eliminating duplicate network round trips.
+- **Parallelized Data Fetching**:
+  - Refactored `PredictionDetailPage`, `ProfilePage`, and `MatchDetailPage` to execute auth checks and data queries concurrently with `Promise.all`.
+- **Instant Route Loading Boundaries**:
+  - Added fast, skeleton-based `loading.tsx` routes for `/search`, `/sign-in`, and `/sign-up`.
+- **High-Visibility Comment Branch Button**:
+  - Updated the expand button in `CommentTreeItem` (`src/components/feed/comment-list.tsx`) from `text-primary` to clean, luminous white (`text-white font-semibold hover:text-white/80`), making comment thread expansion clearly visible.
+
+---
+
 ## Verification & Deployment Summary
 
 | Check | Tool / Command | Result |

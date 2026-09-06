@@ -266,16 +266,16 @@ function CommentTreeItem({
             <button
               type="button"
               onClick={() => setIsExpanded(true)}
-              className="mt-1 flex items-center gap-2 py-1.5 text-xs font-medium text-primary hover:underline transition-colors self-start"
+              className="mt-1 flex items-center gap-2 py-1.5 text-xs font-semibold text-white hover:text-white/80 transition-colors self-start"
             >
               <div className="flex items-center gap-1">
-                <CornerDownRight className="size-3.5" />
+                <CornerDownRight className="size-3.5 text-white" />
                 <span>
                   {comment.replies.length}{" "}
                   {comment.replies.length === 1 ? "reply" : "more replies"}
                 </span>
               </div>
-              <ChevronDown className="size-3" />
+              <ChevronDown className="size-3 text-white" />
             </button>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -124,16 +125,18 @@ export async function getPredictionsByAuthor(
   return withViewerState(predictions, viewerId);
 }
 
-export async function getPredictionById(id: string, viewerId?: string) {
-  const prediction = await prisma.prediction.findUnique({
-    where: { id },
-    select: predictionSelect,
-  });
-  if (!prediction) return null;
+export const getPredictionById = cache(
+  async (id: string, viewerId?: string) => {
+    const prediction = await prisma.prediction.findUnique({
+      where: { id },
+      select: predictionSelect,
+    });
+    if (!prediction) return null;
 
-  const [withState] = await withViewerState([prediction], viewerId);
-  return withState;
-}
+    const [withState] = await withViewerState([prediction], viewerId);
+    return withState;
+  },
+);
 
 export async function getOpenMarketsForComposer() {
   return prisma.market.findMany({

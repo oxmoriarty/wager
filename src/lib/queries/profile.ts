@@ -1,8 +1,9 @@
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
-export async function getProfileByUsername(username: string) {
+export const getProfileByUsername = cache(async (username: string) => {
   const profile = await prisma.profile.findUnique({
     where: { username },
     select: {
@@ -72,7 +73,7 @@ export async function getProfileByUsername(username: string) {
     totalClaimed: (claimStats._sum.amount ?? new Prisma.Decimal(0)).toString(),
     winRate: resolvedPositions > 0 ? totalWins / resolvedPositions : 0,
   };
-}
+});
 
 export type PublicProfile = NonNullable<
   Awaited<ReturnType<typeof getProfileByUsername>>

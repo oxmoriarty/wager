@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -97,55 +98,54 @@ export type MatchDetail = Omit<RawMatch, "markets"> & {
   markets: MarketDetail[];
 };
 
-export async function getMatchById(
-  id: string,
-  viewerId?: string,
-): Promise<MatchDetail | null> {
-  const match = await prisma.match.findUnique({
-    where: { id },
-    select: matchSelect,
-  });
-  if (!match) return null;
+export const getMatchById = cache(
+  async (id: string, viewerId?: string): Promise<MatchDetail | null> => {
+    const match = await prisma.match.findUnique({
+      where: { id },
+      select: matchSelect,
+    });
+    if (!match) return null;
 
-  const viewerPositions =
-    viewerId && match.markets.length > 0
-      ? await prisma.position.findMany({
-          where: {
-            userId: viewerId,
-            marketId: { in: match.markets.map((m) => m.id) },
-          },
-          select: { marketId: true, side: true, amount: true, status: true },
-        })
-      : [];
+    const viewerPositions =
+      viewerId && match.markets.length > 0
+        ? await prisma.position.findMany({
+            where: {
+              userId: viewerId,
+              marketId: { in: match.markets.map((m) => m.id) },
+            },
+            select: { marketId: true, side: true, amount: true, status: true },
+          })
+        : [];
 
-  const viewerPositionByMarketId = new Map(
-    viewerPositions.map((p) => [p.marketId, p]),
-  );
+    const viewerPositionByMarketId = new Map(
+      viewerPositions.map((p) => [p.marketId, p]),
+    );
 
-  return {
-    ...match,
-    markets: match.markets.map((market) => {
-      const viewerPosition = viewerPositionByMarketId.get(market.id);
-      return {
-        ...market,
-        totalSupportAmount: market.totalSupportAmount.toString(),
-        totalChallengeAmount: market.totalChallengeAmount.toString(),
-        viewerPosition: viewerPosition
-          ? {
-              side: viewerPosition.side,
-              amount: viewerPosition.amount.toString(),
-              status: viewerPosition.status,
-            }
-          : null,
-        predictions: market.predictions.map((p) => ({
-          ...p,
-          author: {
-            username: p.author.profile?.username ?? "",
-            displayName: p.author.profile?.displayName ?? "",
-            avatarUrl: p.author.profile?.avatarUrl ?? null,
-          },
-        })),
-      };
-    }),
-  };
-}
+    return {
+      ...match,
+      markets: match.markets.map((market) => {
+        const viewerPosition = viewerPositionByMarketId.get(market.id);
+        return {
+          ...market,
+          totalSupportAmount: market.totalSupportAmount.toString(),
+          totalChallengeAmount: market.totalChallengeAmount.toString(),
+          viewerPosition: viewerPosition
+            ? {
+                side: viewerPosition.side,
+                amount: viewerPosition.amount.toString(),
+                status: viewerPosition.status,
+              }
+            : null,
+          predictions: market.predictions.map((p) => ({
+            ...p,
+            author: {
+              username: p.author.profile?.username ?? "",
+              displayName: p.author.profile?.displayName ?? "",
+              avatarUrl: p.author.profile?.avatarUrl ?? null,
+            },
+          })),
+        };
+      }),
+    };
+  },
+);

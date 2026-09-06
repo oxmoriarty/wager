@@ -51,13 +51,15 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const profile = await getProfileByUsername(username);
+  const [profile, session] = await Promise.all([
+    getProfileByUsername(username),
+    auth(),
+  ]);
 
   if (!profile) {
     notFound();
   }
 
-  const session = await auth();
   const isOwnProfile = session?.user?.id === profile.userId;
 
   const [isFollowing, isFollowingBack, predictions] = await Promise.all([

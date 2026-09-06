@@ -33,7 +33,11 @@ export default async function PredictionDetailPage({
   const { username, predictionId } = await params;
   const session = await auth();
 
-  const prediction = await getPredictionById(predictionId, session?.user?.id);
+  const [prediction, commentsPage] = await Promise.all([
+    getPredictionById(predictionId, session?.user?.id),
+    getCommentsPage(predictionId, session?.user?.id),
+  ]);
+
   if (!prediction) {
     notFound();
   }
@@ -43,8 +47,6 @@ export default async function PredictionDetailPage({
   if (prediction.author.username !== username) {
     redirect(`/${prediction.author.username}/${predictionId}`);
   }
-
-  const commentsPage = await getCommentsPage(predictionId, session?.user?.id);
 
   return (
     <>

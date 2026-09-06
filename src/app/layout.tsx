@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { auth } from "@/auth";
 import { Providers } from "@/components/providers";
+import { NavigationProgress } from "@/components/layout/navigation-progress";
 
 export const metadata: Metadata = {
   title: {
@@ -22,6 +23,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark h-full">
       <body className="flex min-h-full flex-col font-sans antialiased">
+        <NavigationProgress />
         <Providers session={session}>{children}</Providers>
       </body>
     </html>

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -82,6 +83,6 @@ export async function getNotificationsPage(userId: string, cursor?: string) {
   };
 }
 
-export async function getUnreadNotificationCount(userId: string) {
+export const getUnreadNotificationCount = cache(async (userId: string) => {
   return prisma.notification.count({ where: { userId, read: false } });
-}
+});

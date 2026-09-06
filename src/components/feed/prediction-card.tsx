@@ -43,7 +43,7 @@ export function PredictionCard({
   return (
     <Card className="gap-3">
       <div className="flex items-start gap-3">
-        <Link href={`/${author.username}`}>
+        <Link href={`/${author.username}`} prefetch={true}>
           <Avatar>
             <AvatarImage
               src={author.avatarUrl ?? undefined}
@@ -57,6 +57,7 @@ export function PredictionCard({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
             <Link
               href={`/${author.username}`}
+              prefetch={true}
               className="text-foreground font-medium hover:underline"
             >
               {author.displayName}
@@ -78,6 +79,7 @@ export function PredictionCard({
             )}
             <Link
               href={`/matches/${market.match.id}`}
+              prefetch={true}
               className="text-muted-foreground hover:text-foreground hover:underline"
             >
               {market.match.homeTeam} vs {market.match.awayTeam} ·{" "}
@@ -132,6 +134,7 @@ export function PredictionCard({
               />
               <Link
                 href={`/${author.username}/${prediction.id}`}
+                prefetch={true}
                 className="hover:text-foreground flex items-center gap-1.5 transition-colors"
               >
                 <MessageCircle className="size-4" />
