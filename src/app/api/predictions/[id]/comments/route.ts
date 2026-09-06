@@ -11,10 +11,11 @@ export async function GET(
 ) {
   const { id } = await params;
   const { searchParams } = new URL(request.url);
-  const cursor = searchParams.get("cursor") ?? undefined;
+  const sort = (searchParams.get("sort") as "conversational" | "latest" | "likes") || "conversational";
+  const session = await auth();
 
   try {
-    const page = await getCommentsPage(id, cursor);
+    const page = await getCommentsPage(id, session?.user?.id, sort);
     return apiSuccess(page);
   } catch (error) {
     console.error("Failed to load comments:", error);
@@ -56,19 +57,21 @@ export async function POST(
     );
   }
 
+  const targetParentInput = parsed.data.parentReplyId ?? parsed.data.parentId ?? null;
   let targetParentId: string | null = null;
+  let parentAuthorId: string | null = null;
 
-  // Validate parentId belongs to this prediction (prevent cross-post replies)
-  if (parsed.data.parentId) {
+  // Validate parentId belongs to this prediction
+  if (targetParentInput) {
     const parent = await prisma.comment.findUnique({
-      where: { id: parsed.data.parentId },
-      select: { id: true, predictionId: true, parentId: true, authorId: true },
+      where: { id: targetParentInput },
+      select: { id: true, predictionId: true, authorId: true },
     });
     if (!parent || parent.predictionId !== prediction.id) {
       return apiError("Parent comment not found.", 404, "NOT_FOUND");
     }
-    // Flatten to 1 level thread: if the target is already a reply, attach to its root
-    targetParentId = parent.parentId ?? parent.id;
+    targetParentId = parent.id;
+    parentAuthorId = parent.authorId;
   }
 
   try {
@@ -104,6 +107,8 @@ export async function POST(
         displayName: commentRaw.author.profile?.displayName ?? "",
         avatarUrl: commentRaw.author.profile?.avatarUrl ?? null,
       },
+      likeCount: 0,
+      isLiked: false,
       replies: [],
     };
 
@@ -116,33 +121,25 @@ export async function POST(
     });
 
     // Notify appropriate user
-    if (parsed.data.parentId) {
-      // Replying to a comment: notify the comment author
-      const parentComment = await prisma.comment.findUnique({
-        where: { id: parsed.data.parentId },
-        select: { authorId: true },
+    if (parentAuthorId && parentAuthorId !== session.user.id) {
+      const notification = await prisma.notification.create({
+        data: {
+          userId: parentAuthorId,
+          actorId: session.user.id,
+          type: "COMMENT",
+          predictionId: prediction.id,
+          message: `${comment.author.displayName} replied to your comment.`,
+        },
       });
-      if (parentComment && parentComment.authorId !== session.user.id) {
-        const notification = await prisma.notification.create({
-          data: {
-            userId: parentComment.authorId,
-            actorId: session.user.id,
-            type: "COMMENT",
-            predictionId: prediction.id,
-            message: `${comment.author.displayName} replied to your comment.`,
-          },
-        });
 
-        emitNotificationCreated({
-          notificationId: notification.id,
-          userId: parentComment.authorId,
-          type: notification.type,
-          message: notification.message,
-          createdAt: notification.createdAt.toISOString(),
-        });
-      }
-    } else if (prediction.authorId !== session.user.id) {
-      // Top-level comment: notify the prediction author
+      emitNotificationCreated({
+        notificationId: notification.id,
+        userId: parentAuthorId,
+        type: notification.type,
+        message: notification.message,
+        createdAt: notification.createdAt.toISOString(),
+      });
+    } else if (!targetParentId && prediction.authorId !== session.user.id) {
       const notification = await prisma.notification.create({
         data: {
           userId: prediction.authorId,

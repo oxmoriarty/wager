@@ -271,12 +271,45 @@ This document provides a comprehensive technical log of all bugs, architecture c
 
 ---
 
+## 13. Tree-Structured Threaded Replies, Branch Connectors, Collapsible Conversations & Comment Likes
+
+### Issue
+- The comment system lacked true multi-level recursive reply trees, as previous backend handlers flattened all sub-replies directly into 1-level roots.
+- Users could not target and reply to a specific comment in a nested discussion branch (`parentReplyId` was lost).
+- Visual hierarchy lacked tree branch connectors (`├─`, `└─`, `│`), making deep discussions difficult to follow.
+- Deep branches with multiple replies overwhelmed screen space without collapse controls.
+- Comments lacked like interactions (`♡`), unlike prediction posts.
+- Prediction posts on the detail view did not display market probability odds (`YES % / NO %`).
+
+### Resolution
+- **True Recursive Data Model & Query Layer**:
+  - Maintained exact parent-child relations without flattening: `targetParentId = parent.id` in `POST /api/predictions/[id]/comments`.
+  - Built an in-memory recursive tree builder in `src/lib/queries/comments.ts` yielding `CommentNode` trees with arbitrary depth.
+  - Implemented `parentReplyId` validation and targeted author notifications.
+- **Tree Branch Connector UI**:
+  - Implemented branch connectors (`├─` for intermediate siblings and `└─` for terminal siblings) with continuous vertical spines (`│`).
+  - Capped visual indentation at depth 2 (`ml-4 sm:ml-6`) to prevent text squishing on mobile devices.
+- **Collapsible Deep Conversations**:
+  - Added collapsible branch toggles (`└─ X more replies`) for branches with multiple replies, with smooth expand and collapse controls.
+- **Comment Likes System**:
+  - Added `CommentLike` model in Prisma and synchronized with Supabase PostgreSQL (`npx prisma db push`).
+  - Added `POST` and `DELETE` endpoints at `/api/comments/[id]/like` with optimistic UI toggles (`♡` / `♥`).
+- **Contextual Reply Composer**:
+  - Positioned the primary composer beneath the prediction post, supporting contextual replying with `Replying to @username` and `✕ Cancel` actions.
+- **Market Probability & Odds Bar**:
+  - Added a visual YES/NO and Support/Challenge percentage split bar on `PredictionCard` derived from live pool liquidity.
+- **Cohesive Conversation View**:
+  - Created `ConversationView` to unify the composer, tree, sorting modes (Conversational / Latest / Top Liked), and real-time socket updates in-place without page reloads.
+
+---
+
 ## Verification & Deployment Summary
 
 | Check | Tool / Command | Result |
 |---|---|---|
 | **TypeScript Compilation** | `npx tsc --noEmit` | **0 errors** across all files |
-| **Next.js Production Build** | `npm run build` | **30 routes compiled cleanly** (Turbopack + static generation) |
-| **Database Synchronization** | `npx prisma db push` | Synced with Supabase PostgreSQL (models: Comment, Prediction) |
+| **Next.js Production Build** | `npm run build` | **All routes compiled cleanly** (Turbopack + static generation) |
+| **Database Synchronization** | `npx prisma db push` | Synced with Supabase PostgreSQL (models: CommentLike, Comment, Prediction) |
 | **Version Control** | `git push origin main` | Pushed to `oxmoriarty/wager` |
+
 

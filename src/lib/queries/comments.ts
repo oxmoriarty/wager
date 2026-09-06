@@ -1,33 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-const COMMENTS_PAGE_SIZE = 20;
-
 const authorSelect = {
   profile: {
     select: { username: true, displayName: true, avatarUrl: true },
   },
 } satisfies Prisma.UserSelect;
-
-const replySelect = {
-  id: true,
-  content: true,
-  createdAt: true,
-  parentId: true,
-  author: { select: authorSelect },
-} satisfies Prisma.CommentSelect;
-
-const commentSelect = {
-  id: true,
-  content: true,
-  createdAt: true,
-  parentId: true,
-  author: { select: authorSelect },
-  replies: {
-    orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }],
-    select: replySelect,
-  },
-} satisfies Prisma.CommentSelect;
 
 type RawAuthor = {
   profile: {
@@ -45,54 +23,90 @@ function flattenAuthor(raw?: RawAuthor | null) {
   };
 }
 
-export type CommentReply = {
+export type CommentNode = {
   id: string;
   content: string;
   createdAt: Date | string;
   parentId: string | null;
-  author: { username: string; displayName: string; avatarUrl: string | null };
+  author: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  likeCount: number;
+  isLiked: boolean;
+  replies: CommentNode[];
 };
 
-export type CommentRow = {
-  id: string;
-  content: string;
-  createdAt: Date | string;
-  parentId: string | null;
-  author: { username: string; displayName: string; avatarUrl: string | null };
-  replies: CommentReply[];
-};
+// Aliases for compatibility
+export type CommentRow = CommentNode;
+export type CommentReply = CommentNode;
 
-export async function getCommentsPage(predictionId: string, cursor?: string) {
-  // Only top-level comments (parentId null); replies come nested inside each.
-  const comments = await prisma.comment.findMany({
-    where: { predictionId, parentId: null },
-    take: COMMENTS_PAGE_SIZE + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+export type CommentSortMode = "conversational" | "latest" | "likes";
+
+export async function getCommentsPage(
+  predictionId: string,
+  viewerId?: string,
+  sort: CommentSortMode = "conversational",
+) {
+  // Query all comments for this prediction to build full recursive hierarchy
+  const rawComments = await prisma.comment.findMany({
+    where: { predictionId },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: commentSelect,
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      parentId: true,
+      author: { select: authorSelect },
+      likes: {
+        select: { userId: true },
+      },
+    },
   });
 
-  const hasMore = comments.length > COMMENTS_PAGE_SIZE;
-  const items: CommentRow[] = (
-    hasMore ? comments.slice(0, COMMENTS_PAGE_SIZE) : comments
-  ).map((c) => ({
-    id: c.id,
-    content: c.content,
-    createdAt: c.createdAt,
-    parentId: c.parentId,
-    author: flattenAuthor(c.author),
-    replies: c.replies.map((r) => ({
-      id: r.id,
-      content: r.content,
-      createdAt: r.createdAt,
-      parentId: r.parentId,
-      author: flattenAuthor(r.author),
-    })),
-  }));
+  // Construct recursive tree
+  const map = new Map<string, CommentNode>();
+  const roots: CommentNode[] = [];
+
+  for (const c of rawComments) {
+    const isLiked = viewerId ? c.likes.some((l) => l.userId === viewerId) : false;
+    map.set(c.id, {
+      id: c.id,
+      content: c.content,
+      createdAt: c.createdAt,
+      parentId: c.parentId,
+      author: flattenAuthor(c.author),
+      likeCount: c.likes.length,
+      isLiked,
+      replies: [],
+    });
+  }
+
+  for (const c of rawComments) {
+    const node = map.get(c.id)!;
+    if (c.parentId && map.has(c.parentId)) {
+      map.get(c.parentId)!.replies.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  // Sort top-level roots based on mode
+  if (sort === "latest") {
+    roots.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  } else if (sort === "likes") {
+    roots.sort((a, b) => b.likeCount - a.likeCount);
+  }
+  // "conversational" preserves ascending chronological order
 
   return {
-    items,
-    nextCursor: hasMore ? items[items.length - 1]!.id : null,
+    items: roots,
+    totalCount: rawComments.length,
+    nextCursor: null,
   };
 }
 

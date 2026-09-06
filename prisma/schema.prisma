@@ -41,6 +41,7 @@ model User {
   positions   Position[]
   comments    Comment[]   @relation("CommentAuthor")
   likes       Like[]
+  commentLikes CommentLike[] @relation("CommentLikes")
   reposts     Repost[]
   transactions Transaction[]
 
@@ -248,9 +249,24 @@ model Comment {
   parent       Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies      Comment[]  @relation("CommentReplies")
 
+  likes        CommentLike[]
+
   @@index([predictionId])
   @@index([parentId])
   @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("CommentLikes", fields: [userId], references: [id], onDelete: Cascade)
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
 }
 
 model Like {

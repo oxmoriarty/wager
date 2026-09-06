@@ -8,8 +8,7 @@ import { getCommentsPage } from "@/lib/queries/comments";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PredictionCard } from "@/components/feed/prediction-card";
-import { CommentComposer } from "@/components/feed/comment-composer";
-import { CommentList } from "@/components/feed/comment-list";
+import { ConversationView } from "@/components/feed/conversation-view";
 
 export async function generateMetadata({
   params,
@@ -46,7 +45,7 @@ export default async function PredictionDetailPage({
     redirect(`/${prediction.author.username}/${predictionId}`);
   }
 
-  const commentsPage = await getCommentsPage(predictionId);
+  const commentsPage = await getCommentsPage(predictionId, session?.user?.id);
 
   return (
     <>
@@ -63,14 +62,16 @@ export default async function PredictionDetailPage({
           prediction={prediction}
           isAuthenticated={Boolean(session?.user)}
         />
-        <CommentList
+
+        {/* Tree vertical connector line from Prediction Post into Conversation */}
+        <div className="relative pl-6 -my-2">
+          <div className="h-4 w-0.5 bg-border/80" />
+        </div>
+
+        <ConversationView
           predictionId={predictionId}
-          initialPage={commentsPage}
-          isAuthenticated={Boolean(session?.user)}
-          currentUser={session?.user}
-        />
-        <CommentComposer
-          predictionId={predictionId}
+          initialComments={commentsPage.items}
+          totalCount={commentsPage.totalCount}
           isAuthenticated={Boolean(session?.user)}
           currentUser={session?.user}
         />

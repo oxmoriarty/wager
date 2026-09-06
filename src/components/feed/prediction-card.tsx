@@ -78,6 +78,39 @@ export function PredictionCard({
             {prediction.content}
           </p>
 
+          {(() => {
+            const supportNum = Number((market as any).totalSupportAmount ?? 0);
+            const challengeNum = Number((market as any).totalChallengeAmount ?? 0);
+            const totalPool = supportNum + challengeNum;
+            if (totalPool <= 0) return null;
+
+            const supportPct = Math.round((supportNum / totalPool) * 100);
+            const challengePct = 100 - supportPct;
+
+            return (
+              <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                <div className="flex items-center justify-between font-medium">
+                  <span className="text-emerald-500">
+                    YES / Support {supportPct}%
+                  </span>
+                  <span className="text-amber-500">
+                    NO / Challenge {challengePct}%
+                  </span>
+                </div>
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-amber-500/20">
+                  <div
+                    className="bg-emerald-500 transition-all duration-300"
+                    style={{ width: `${supportPct}%` }}
+                  />
+                  <div
+                    className="bg-amber-500 transition-all duration-300"
+                    style={{ width: `${challengePct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="text-muted-foreground flex items-center gap-5 pt-1 text-xs">
             <LikeButton
               predictionId={prediction.id}

@@ -1,24 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  CornerDownRight,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { formatRelativeTime } from "@/lib/format";
-import { getSocketClient } from "@/lib/socket/client";
-import { rooms } from "@/lib/socket/events";
-import type { CommentRow, CommentReply } from "@/lib/queries/comments";
-import type { ApiError, ApiSuccess } from "@/lib/api-response";
-
-interface CommentsPage {
-  items: CommentRow[];
-  nextCursor: string | null;
-}
+import { cn } from "@/lib/utils";
+import type { CommentNode, CommentSortMode } from "@/lib/queries/comments";
+import type { ReplyTarget } from "@/components/feed/comment-composer";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -30,438 +29,358 @@ function initials(name?: string | null) {
     .join("");
 }
 
-// ─── Inline reply composer ────────────────────────────────────────────────────
+// ─── Comment Like Button ──────────────────────────────────────────────────────
 
-function ReplyComposer({
-  predictionId,
-  parentId,
-  replyToHandle,
-  onSuccess,
-  onCancel,
-}: {
-  predictionId: string;
-  parentId: string;
-  replyToHandle: string | null;
-  onSuccess: (reply: CommentReply) => void;
-  onCancel: () => void;
-}) {
-  const [content, setContent] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = content.trim();
-    if (!trimmed) return;
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`/api/predictions/${predictionId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: trimmed, parentId }),
-      });
-      const body = (await res.json()) as ApiSuccess<CommentReply> | ApiError;
-      if (body.success) {
-        onSuccess(body.data);
-        setContent("");
-      } else {
-        toast.error(body.message);
-      }
-    } catch {
-      toast.error("Failed to post reply. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      {replyToHandle && (
-        <div className="text-xs text-muted-foreground">
-          Replying to <span className="text-primary font-medium">@{replyToHandle}</span>
-        </div>
-      )}
-      <Textarea
-        ref={textareaRef}
-        placeholder="Post your reply…"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        maxLength={500}
-        disabled={isSubmitting}
-        className="min-h-[64px] resize-none text-sm bg-muted/30 focus-visible:bg-background"
-        rows={2}
-      />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {content.length}/500
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="h-7 px-3 text-xs"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={isSubmitting || !content.trim()}
-            className="h-7 rounded-full px-4 text-xs font-semibold"
-          >
-            {isSubmitting ? "Posting…" : "Reply"}
-          </Button>
-        </div>
-      </div>
-    </form>
-  );
-}
-
-// ─── Single comment with optional replies ─────────────────────────────────────
-
-function CommentItem({
-  comment,
-  predictionId,
+function CommentLikeButton({
+  commentId,
+  initialLiked,
+  initialCount,
   isAuthenticated,
-  currentUser,
 }: {
-  comment: CommentRow;
-  predictionId: string;
+  commentId: string;
+  initialLiked: boolean;
+  initialCount: number;
   isAuthenticated: boolean;
-  currentUser?: {
-    name?: string | null;
-    image?: string | null;
-  } | null;
 }) {
   const router = useRouter();
-  const [replies, setReplies] = useState<CommentReply[]>(comment.replies);
-  const [showReplyComposer, setShowReplyComposer] = useState(false);
-  const [replyToHandle, setReplyToHandle] = useState<string | null>(null);
-  const [replyTargetId, setReplyTargetId] = useState<string>(comment.id);
+  const [liked, setLiked] = useState(initialLiked);
+  const [count, setCount] = useState(initialCount);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
-    setReplies(comment.replies);
-  }, [comment.replies]);
+    setLiked(initialLiked);
+    setCount(initialCount);
+  }, [initialLiked, initialCount]);
 
-  function handleReplySuccess(reply: CommentReply) {
-    setReplies((prev) => [...prev, reply]);
-    setShowReplyComposer(false);
-    setReplyToHandle(null);
-    setReplyTargetId(comment.id);
-    window.dispatchEvent(new CustomEvent("wager:comment_added"));
-  }
-
-  function handleOpenReply(handle?: string | null, targetCommentId?: string) {
+  async function handleToggleLike() {
     if (!isAuthenticated) {
       router.push("/sign-in");
       return;
     }
-    setReplyToHandle(handle ?? null);
-    setReplyTargetId(targetCommentId ?? comment.id);
-    setShowReplyComposer(true);
+    if (isPending) return;
+
+    const nextLiked = !liked;
+    const nextCount = nextLiked ? count + 1 : Math.max(0, count - 1);
+    setLiked(nextLiked);
+    setCount(nextCount);
+    setIsPending(true);
+
+    try {
+      const res = await fetch(`/api/comments/${commentId}/like`, {
+        method: nextLiked ? "POST" : "DELETE",
+      });
+      const body = await res.json();
+      if (body.success) {
+        setLiked(body.data.liked);
+        setCount(body.data.likeCount);
+      } else {
+        setLiked(liked);
+        setCount(count);
+      }
+    } catch {
+      setLiked(liked);
+      setCount(count);
+    } finally {
+      setIsPending(false);
+    }
   }
 
-  const hasReplies = replies.length > 0;
-  const isParentConnected = hasReplies || showReplyComposer;
+  return (
+    <button
+      type="button"
+      onClick={handleToggleLike}
+      className={cn(
+        "group flex items-center gap-1.5 text-xs transition-colors focus:outline-none",
+        liked
+          ? "text-rose-500 font-medium"
+          : "text-muted-foreground hover:text-rose-500",
+      )}
+      title={liked ? "Unlike" : "Like"}
+    >
+      <Heart
+        className={cn(
+          "size-3.5 transition-transform group-hover:scale-110",
+          liked && "fill-current",
+        )}
+      />
+      <span>{count > 0 ? count : ""}</span>
+    </button>
+  );
+}
+
+// ─── Recursive Tree Item ──────────────────────────────────────────────────────
+
+function CommentTreeItem({
+  comment,
+  predictionId,
+  depth = 0,
+  isLast = false,
+  isAuthenticated,
+  onSelectReply,
+}: {
+  comment: CommentNode;
+  predictionId: string;
+  depth?: number;
+  isLast?: boolean;
+  isAuthenticated: boolean;
+  onSelectReply?: (target: ReplyTarget) => void;
+}) {
+  const router = useRouter();
+  const hasReplies = comment.replies && comment.replies.length > 0;
+  // Automatically expand if <= 2 replies; collapse if > 2 replies by default
+  const [isExpanded, setIsExpanded] = useState(
+    hasReplies && comment.replies.length <= 2,
+  );
+
+  function handleReplyClick() {
+    if (!isAuthenticated) {
+      router.push("/sign-in");
+      return;
+    }
+    onSelectReply?.({
+      id: comment.id,
+      username: comment.author.username,
+      displayName: comment.author.displayName,
+    });
+  }
+
+  // Cap visual indentation depth at level 2 so content remains readable on mobile
+  const indentClass =
+    depth === 0
+      ? ""
+      : depth === 1
+        ? "ml-4 sm:ml-6"
+        : "ml-2 sm:ml-4";
 
   return (
-    <div className="flex flex-col">
-      {/* ── Top-level Parent Comment ── */}
-      <div className="flex gap-3">
-        {/* Left Column: Avatar & Vertical Connector */}
-        <div className="relative flex w-9 shrink-0 flex-col items-center">
-          <Link
-            href={comment.author.username ? `/${comment.author.username}` : "#"}
-            className="relative z-10"
-          >
-            <Avatar className="size-9 shrink-0 bg-background ring-4 ring-background">
-              <AvatarImage
-                src={comment.author.avatarUrl ?? undefined}
-                alt={comment.author.displayName}
-              />
-              <AvatarFallback className="text-xs font-medium">
-                {initials(comment.author.displayName)}
-              </AvatarFallback>
-            </Avatar>
-          </Link>
+    <div className={cn("relative flex flex-col", indentClass)}>
+      {/* Tree branch connector for nested replies */}
+      {depth > 0 && (
+        <>
+          {/* Vertical line from top to horizontal branch */}
+          <div
+            className={cn(
+              "absolute -left-3.5 sm:-left-5 top-0 w-0.5 bg-border/80",
+              isLast ? "h-4 rounded-bl-sm" : "bottom-0",
+            )}
+          />
+          {/* Horizontal branch reaching into the comment */}
+          <div className="absolute -left-3.5 sm:-left-5 top-4 h-0.5 w-3 sm:w-4 bg-border/80" />
+        </>
+      )}
 
-          {/* Vertical connector extending downwards to replies/composer */}
-          {isParentConnected && (
-            <div className="absolute top-5 bottom-0 w-0.5 bg-border left-1/2 -translate-x-1/2 z-0" />
-          )}
-        </div>
+      {/* Main Comment Row */}
+      <div className="flex gap-2.5 sm:gap-3 py-2">
+        <Link
+          href={comment.author.username ? `/${comment.author.username}` : "#"}
+          className="shrink-0"
+        >
+          <Avatar className="size-8 sm:size-9 shrink-0 bg-background ring-2 ring-background">
+            <AvatarImage
+              src={comment.author.avatarUrl ?? undefined}
+              alt={comment.author.displayName}
+            />
+            <AvatarFallback className="text-xs font-medium">
+              {initials(comment.author.displayName)}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
-        {/* Right Column: Content & Actions */}
-        <div className="flex min-w-0 flex-1 flex-col pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
-              <Link
-                href={comment.author.username ? `/${comment.author.username}` : "#"}
-                className="text-foreground font-semibold text-sm hover:underline truncate max-w-[180px] sm:max-w-xs"
-              >
-                {comment.author.displayName}
-              </Link>
-              {comment.author.username && (
-                <span className="text-muted-foreground text-xs truncate">
-                  @{comment.author.username}
-                </span>
-              )}
-              <span className="text-muted-foreground text-xs">·</span>
-              <span className="text-muted-foreground text-xs shrink-0">
-                {formatRelativeTime(comment.createdAt)}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Header */}
+          <div className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
+            <Link
+              href={
+                comment.author.username ? `/${comment.author.username}` : "#"
+              }
+              className="text-foreground font-semibold text-sm hover:underline truncate max-w-[160px] sm:max-w-xs"
+            >
+              {comment.author.displayName}
+            </Link>
+            {comment.author.username && (
+              <span className="text-muted-foreground text-xs truncate">
+                @{comment.author.username}
               </span>
-            </div>
+            )}
+            <span className="text-muted-foreground text-xs">·</span>
+            <span className="text-muted-foreground text-xs shrink-0">
+              {formatRelativeTime(comment.createdAt)}
+            </span>
           </div>
 
-          <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap mt-1 break-words">
+          {/* Content */}
+          <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap mt-0.5 break-words">
             {comment.content}
           </p>
 
-          <div className="flex items-center gap-6 mt-2">
+          {/* Actions: Like & Reply */}
+          <div className="flex items-center gap-5 mt-1.5 text-muted-foreground">
+            <CommentLikeButton
+              commentId={comment.id}
+              initialLiked={comment.isLiked}
+              initialCount={comment.likeCount}
+              isAuthenticated={isAuthenticated}
+            />
+
             <button
               type="button"
-              onClick={() => handleOpenReply(comment.author.username, comment.id)}
-              className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors focus:outline-none"
-              title="Reply"
+              onClick={handleReplyClick}
+              className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+              title={`Reply to @${comment.author.username}`}
             >
-              <div className="p-1.5 rounded-full group-hover:bg-primary/10 transition-colors">
-                <MessageCircle className="size-3.5" />
-              </div>
-              <span>{replies.length > 0 ? replies.length : "Reply"}</span>
+              <CornerDownRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+              <span>Reply</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Replies in Thread ── */}
-      {replies.map((reply, index) => {
-        const isLastReply = index === replies.length - 1;
-        const hasFollowup = !isLastReply || showReplyComposer;
+      {/* Nested Replies Tree */}
+      {hasReplies && (
+        <div className="relative border-l-2 border-border/70 pl-2 sm:pl-3 ml-3.5 sm:ml-4 flex flex-col">
+          {isExpanded ? (
+            <>
+              {comment.replies.map((child, idx) => (
+                <CommentTreeItem
+                  key={child.id}
+                  comment={child}
+                  predictionId={predictionId}
+                  depth={depth + 1}
+                  isLast={idx === comment.replies.length - 1}
+                  isAuthenticated={isAuthenticated}
+                  onSelectReply={onSelectReply}
+                />
+              ))}
 
-        return (
-          <div key={reply.id} className="flex gap-3">
-            {/* Left Column: Avatar & Vertical Connector */}
-            <div className="relative flex w-9 shrink-0 flex-col items-center">
-              {hasFollowup ? (
-                // Full vertical line passing behind avatar
-                <div className="absolute top-0 bottom-0 w-0.5 bg-border left-1/2 -translate-x-1/2 z-0" />
-              ) : (
-                // Line enters from top and terminates inside avatar
-                <div className="absolute top-0 h-5 w-0.5 bg-border left-1/2 -translate-x-1/2 z-0" />
-              )}
-
-              <Link
-                href={reply.author.username ? `/${reply.author.username}` : "#"}
-                className="relative z-10"
-              >
-                <Avatar className="size-9 shrink-0 bg-background ring-4 ring-background">
-                  <AvatarImage
-                    src={reply.author.avatarUrl ?? undefined}
-                    alt={reply.author.displayName}
-                  />
-                  <AvatarFallback className="text-xs font-medium">
-                    {initials(reply.author.displayName)}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-
-            {/* Right Column: Reply Content & Actions */}
-            <div className="flex min-w-0 flex-1 flex-col pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
-                  <Link
-                    href={reply.author.username ? `/${reply.author.username}` : "#"}
-                    className="text-foreground font-semibold text-sm hover:underline truncate max-w-[180px] sm:max-w-xs"
-                  >
-                    {reply.author.displayName}
-                  </Link>
-                  {reply.author.username && (
-                    <span className="text-muted-foreground text-xs truncate">
-                      @{reply.author.username}
-                    </span>
-                  )}
-                  <span className="text-muted-foreground text-xs">·</span>
-                  <span className="text-muted-foreground text-xs shrink-0">
-                    {formatRelativeTime(reply.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap mt-1 break-words">
-                {reply.content}
-              </p>
-
-              <div className="flex items-center gap-6 mt-2">
+              {comment.replies.length > 2 && (
                 <button
                   type="button"
-                  onClick={() => handleOpenReply(reply.author.username, reply.id)}
-                  className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors focus:outline-none"
-                  title="Reply"
+                  onClick={() => setIsExpanded(false)}
+                  className="mt-1 flex items-center gap-1.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors self-start"
                 >
-                  <div className="p-1.5 rounded-full group-hover:bg-primary/10 transition-colors">
-                    <MessageCircle className="size-3.5" />
-                  </div>
-                  <span>Reply</span>
+                  <ChevronUp className="size-3.5" />
+                  <span>Collapse replies</span>
                 </button>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              className="mt-1 flex items-center gap-2 py-1.5 text-xs font-medium text-primary hover:underline transition-colors self-start"
+            >
+              <div className="flex items-center gap-1">
+                <CornerDownRight className="size-3.5" />
+                <span>
+                  {comment.replies.length}{" "}
+                  {comment.replies.length === 1 ? "reply" : "more replies"}
+                </span>
               </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* ── Inline Reply Composer (connected into thread) ── */}
-      {showReplyComposer && (
-        <div className="flex gap-3 pt-1">
-          <div className="relative flex w-9 shrink-0 flex-col items-center">
-            {/* Line entering from above and terminating inside composer avatar */}
-            <div className="absolute top-0 h-5 w-0.5 bg-border left-1/2 -translate-x-1/2 z-0" />
-            <Avatar className="size-9 shrink-0 relative z-10 bg-background ring-4 ring-background">
-              <AvatarImage
-                src={currentUser?.image ?? undefined}
-                alt={currentUser?.name ?? "You"}
-              />
-              <AvatarFallback className="text-xs font-medium">
-                {initials(currentUser?.name ?? "You")}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-col pb-2">
-            <ReplyComposer
-              predictionId={predictionId}
-              parentId={replyTargetId}
-              replyToHandle={replyToHandle}
-              onSuccess={handleReplySuccess}
-              onCancel={() => {
-                setShowReplyComposer(false);
-                setReplyToHandle(null);
-                setReplyTargetId(comment.id);
-              }}
-            />
-          </div>
+              <ChevronDown className="size-3" />
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Comment list ─────────────────────────────────────────────────────────────
+// ─── Full Threaded Comment List ───────────────────────────────────────────────
 
 export function CommentList({
   predictionId,
-  initialPage,
+  comments,
+  totalCount,
   isAuthenticated,
-  currentUser,
+  sortMode = "conversational",
+  onSortChange,
+  onSelectReply,
 }: {
   predictionId: string;
-  initialPage: CommentsPage;
+  comments: CommentNode[];
+  totalCount: number;
   isAuthenticated: boolean;
-  currentUser?: {
-    name?: string | null;
-    image?: string | null;
-  } | null;
+  sortMode?: CommentSortMode;
+  onSortChange?: (mode: CommentSortMode) => void;
+  onSelectReply?: (target: ReplyTarget) => void;
 }) {
-  const [comments, setComments] = useState(initialPage.items);
-  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  useEffect(() => {
-    setComments(initialPage.items);
-    setNextCursor(initialPage.nextCursor);
-  }, [initialPage.items, initialPage.nextCursor]);
-
-  async function loadFreshComments() {
-    try {
-      const response = await fetch(`/api/predictions/${predictionId}/comments`);
-      const body = (await response.json()) as ApiSuccess<CommentsPage>;
-      if (body.success) {
-        setComments(body.data.items);
-        setNextCursor(body.data.nextCursor);
-      }
-    } catch {
-      // non-critical
-    }
-  }
-
-  useEffect(() => {
-    const socket = getSocketClient();
-    const room = rooms.post(predictionId);
-    socket.emit("join", room);
-
-    const handleCommentAdded = () => {
-      loadFreshComments();
-    };
-    socket.on("comment_added", handleCommentAdded);
-    window.addEventListener("wager:comment_added", handleCommentAdded);
-
-    return () => {
-      socket.emit("leave", room);
-      socket.off("comment_added", handleCommentAdded);
-      window.removeEventListener("wager:comment_added", handleCommentAdded);
-    };
-  }, [predictionId]);
-
-  async function loadMore() {
-    if (!nextCursor) return;
-    setIsLoadingMore(true);
-    try {
-      const response = await fetch(
-        `/api/predictions/${predictionId}/comments?cursor=${nextCursor}`,
-      );
-      const body = (await response.json()) as ApiSuccess<CommentsPage>;
-      if (body.success) {
-        setComments((current) => [...current, ...body.data.items]);
-        setNextCursor(body.data.nextCursor);
-      }
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }
-
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
+      {/* Header & Sorting Bar */}
+      <div className="flex items-center justify-between border-b border-border/60 pb-2.5 text-xs">
+        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+          <MessageCircle className="size-4 text-muted-foreground" />
+          <span>
+            {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
+          </span>
+        </div>
+
+        {/* Sorting controls */}
+        {comments.length > 1 && onSortChange && (
+          <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-0.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => onSortChange("conversational")}
+              className={cn(
+                "rounded-md px-2 py-1 font-medium transition-colors",
+                sortMode === "conversational"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Oldest
+            </button>
+            <button
+              type="button"
+              onClick={() => onSortChange("latest")}
+              className={cn(
+                "rounded-md px-2 py-1 font-medium transition-colors",
+                sortMode === "latest"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Latest
+            </button>
+            <button
+              type="button"
+              onClick={() => onSortChange("likes")}
+              className={cn(
+                "rounded-md px-2 py-1 font-medium transition-colors",
+                sortMode === "likes"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Top Liked
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Tree Content */}
       {comments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-8 text-center">
           <p className="text-muted-foreground text-sm">
-            No comments yet. Be the first to reply.
+            No comments yet. Be the first to start the discussion!
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/70 bg-card divide-y divide-border/60 shadow-sm overflow-hidden">
-          {comments.map((comment) => (
-            <div key={comment.id} className="p-4 sm:p-5">
-              <CommentItem
+        <div className="rounded-xl border border-border/70 bg-card p-3 sm:p-5 shadow-sm divide-y divide-border/50">
+          {comments.map((comment, idx) => (
+            <div key={comment.id} className="py-2.5 first:pt-0 last:pb-0">
+              <CommentTreeItem
                 comment={comment}
                 predictionId={predictionId}
+                depth={0}
+                isLast={idx === comments.length - 1}
                 isAuthenticated={isAuthenticated}
-                currentUser={currentUser}
+                onSelectReply={onSelectReply}
               />
             </div>
           ))}
         </div>
       )}
-
-      {nextCursor && (
-        <Button
-          variant="outline"
-          onClick={loadMore}
-          disabled={isLoadingMore}
-          className="self-center"
-        >
-          {isLoadingMore ? "Loading…" : "Load more"}
-        </Button>
-      )}
     </div>
   );
 }
-
-

@@ -19,6 +19,8 @@ const predictionSelect = {
     select: {
       id: true,
       type: true,
+      totalSupportAmount: true,
+      totalChallengeAmount: true,
       match: {
         select: {
           id: true,
@@ -38,23 +40,18 @@ type PredictionRow = Prisma.PredictionGetPayload<{
   select: typeof predictionSelect;
 }>;
 
-function flattenAuthor<
-  T extends {
-    author: {
-      profile: {
-        username: string;
-        displayName: string;
-        avatarUrl: string | null;
-      } | null;
-    };
-  },
->(row: T) {
+function flattenPrediction<T extends PredictionRow>(row: T) {
   return {
     ...row,
     author: {
       username: row.author.profile?.username ?? "",
       displayName: row.author.profile?.displayName ?? "",
       avatarUrl: row.author.profile?.avatarUrl ?? null,
+    },
+    market: {
+      ...row.market,
+      totalSupportAmount: row.market.totalSupportAmount.toString(),
+      totalChallengeAmount: row.market.totalChallengeAmount.toString(),
     },
   };
 }
@@ -66,7 +63,7 @@ async function withViewerState(
 ) {
   if (!viewerId || predictions.length === 0) {
     return predictions.map((p) => ({
-      ...flattenAuthor(p),
+      ...flattenPrediction(p),
       isLikedByViewer: false,
       isRepostedByViewer: false,
     }));
@@ -87,7 +84,7 @@ async function withViewerState(
   const repostedIds = new Set(repostedRows.map((row) => row.predictionId));
 
   return predictions.map((p) => ({
-    ...flattenAuthor(p),
+    ...flattenPrediction(p),
     isLikedByViewer: likedIds.has(p.id),
     isRepostedByViewer: repostedIds.has(p.id),
   }));
