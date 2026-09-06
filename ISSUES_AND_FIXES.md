@@ -303,6 +303,27 @@ This document provides a comprehensive technical log of all bugs, architecture c
 
 ---
 
+## 14. Fixed-Bottom Expandable Comment Composer
+
+### Issue
+- The comment composer box was placed between the prediction post and comments, cluttering the top of the conversation view and moving away as the page was scrolled.
+- Users had to scroll past the composer to see discussion threads, or scroll all the way back up to reply.
+- When fixed to the bottom, static composers took up significant vertical screen space on mobile devices.
+
+### Resolution
+- **Reordered Hierarchy**: Placed the comments tree (`CommentList`) immediately beneath the prediction post so users encounter the conversation directly without interruption.
+- **Fixed Bottom Positioning**: Styled `CommentComposer` with `fixed bottom-0 left-0 right-0 z-40` and pointer-events layering so it stays anchored at the bottom of the viewport during scrolling.
+- **Progressive Disclosure & Dynamic Expand/Collapse**:
+  - **Compact Initial State**: Defaults to a sleek, low-height pill bar (~44px) with the user avatar, placeholder ("Post your reply…"), and a compact "Reply" button.
+  - **Expanded Active State**: When clicked or focused (or when replying to a specific user in the tree), the bar expands smoothly into a full-height composer displaying the "Replying to @username" chip, multi-line auto-focusing textarea, character counter (`0/500`), "Cancel" button, and submit button.
+  - **Smart Collapse**: Automatically collapses back to compact mode on cancel or when the user clicks outside without entering text.
+- **Viewport & Safe Area Protection**:
+  - Added safe area inset padding (`pb-[max(0.75rem,env(safe-area-inset-bottom))]`) for iOS mobile home bars.
+  - Added bottom padding (`pb-28 sm:pb-32`) to the conversation container so the last comments in the tree and pagination controls are never obscured behind the floating bottom bar.
+  - Rendered a smooth upward gradient backdrop fade (`h-28 bg-gradient-to-t from-background via-background/85 to-transparent`) behind the bar for seamless contrast.
+
+---
+
 ## Verification & Deployment Summary
 
 | Check | Tool / Command | Result |

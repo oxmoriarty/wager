@@ -81,10 +81,6 @@ export function ConversationView({
 
   function handleSelectReply(target: ReplyTarget) {
     setReplyTarget(target);
-    const composerEl = document.getElementById("comment-composer");
-    if (composerEl) {
-      composerEl.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
   }
 
   function handleCancelReply() {
@@ -132,18 +128,8 @@ export function ConversationView({
   }, [predictionId, sortMode]);
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ── Reply Composer (Section 7: placed right under the prediction post) ── */}
-      <CommentComposer
-        predictionId={predictionId}
-        isAuthenticated={isAuthenticated}
-        currentUser={currentUser}
-        replyTarget={replyTarget}
-        onCancelReply={handleCancelReply}
-        onCommentSubmitted={handleCommentSubmitted}
-      />
-
-      {/* ── Threaded Reply Tree ── */}
+    <div className="flex flex-col gap-5 pb-28 sm:pb-32">
+      {/* ── Threaded Reply Tree (Rendered right under the post) ── */}
       <CommentList
         predictionId={predictionId}
         comments={comments}
@@ -152,6 +138,16 @@ export function ConversationView({
         sortMode={sortMode}
         onSortChange={handleSortChange}
         onSelectReply={handleSelectReply}
+      />
+
+      {/* ── Reply Composer (Fixed to the bottom of the screen) ── */}
+      <CommentComposer
+        predictionId={predictionId}
+        isAuthenticated={isAuthenticated}
+        currentUser={currentUser}
+        replyTarget={replyTarget}
+        onCancelReply={handleCancelReply}
+        onCommentSubmitted={handleCommentSubmitted}
       />
     </div>
   );
