@@ -250,6 +250,27 @@ This document provides a comprehensive technical log of all bugs, architecture c
 
 ---
 
+## 12. Conversation Thread Timeline & Relocated Comment Composer
+
+### Issue
+- Comments and replies were displayed as isolated, disconnected card blocks with excessive padding, heavy margins, and stepped indents that broke visual conversation continuity.
+- The comment composer box was positioned awkwardly between the prediction post and the comments section, rather than below the discussion stream.
+
+### Resolution
+- **Connected Vertical Timeline**:
+  - Replaced isolated card containers with a unified conversation thread layout where parent comments and replies share a single vertical alignment axis.
+  - Implemented continuous vertical connector lines (`w-0.5 bg-border`) linking parent avatars directly to subsequent reply avatars, with lines neatly masked behind solid circular avatars (`relative z-10 bg-background ring-4 ring-background`).
+  - Terminal connector segments terminate cleanly within the final reply's avatar, ensuring no dangling lines.
+- **Thread Separation**:
+  - Divided distinct root conversation threads using subtle horizontal border dividers (`divide-y divide-border/60`), eliminating bulky card shadows.
+- **Inline Reply Experience**:
+  - Connected the inline `ReplyComposer` directly into the thread timeline, displaying the active user's avatar in column alignment and automatically linking to the parent discussion.
+- **Relocated Primary Composer**:
+  - Moved `CommentComposer` below all comments in `src/app/[username]/[predictionId]/page.tsx`, so readers encounter the conversation thread first and can reply at the bottom of the discussion.
+  - Enhanced the composer with current user avatar display, borderless clean textarea, character count, and instantaneous client-side event dispatch (`wager:comment_added`).
+
+---
+
 ## Verification & Deployment Summary
 
 | Check | Tool / Command | Result |
@@ -257,4 +278,5 @@ This document provides a comprehensive technical log of all bugs, architecture c
 | **TypeScript Compilation** | `npx tsc --noEmit` | **0 errors** across all files |
 | **Next.js Production Build** | `npm run build` | **30 routes compiled cleanly** (Turbopack + static generation) |
 | **Database Synchronization** | `npx prisma db push` | Synced with Supabase PostgreSQL (models: Comment, Prediction) |
-| **Version Control** | `git push origin main` | Pushed up to commit `3c3ee28` on `oxmoriarty/wager` |
+| **Version Control** | `git push origin main` | Pushed to `oxmoriarty/wager` |
+

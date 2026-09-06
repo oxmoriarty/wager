@@ -63,14 +63,16 @@ export default async function PredictionDetailPage({
           prediction={prediction}
           isAuthenticated={Boolean(session?.user)}
         />
-        <CommentComposer
-          predictionId={predictionId}
-          isAuthenticated={Boolean(session?.user)}
-        />
         <CommentList
           predictionId={predictionId}
           initialPage={commentsPage}
           isAuthenticated={Boolean(session?.user)}
+          currentUser={session?.user}
+        />
+        <CommentComposer
+          predictionId={predictionId}
+          isAuthenticated={Boolean(session?.user)}
+          currentUser={session?.user}
         />
       </main>
     </>

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { createCommentSchema } from "@/lib/validation/comment";
@@ -11,12 +12,27 @@ import type { ApiError, ApiSuccess } from "@/lib/api-response";
 
 const CONTENT_MAX_LENGTH = 500;
 
+function initials(name?: string | null) {
+  if (!name) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function CommentComposer({
   predictionId,
   isAuthenticated,
+  currentUser,
 }: {
   predictionId: string;
   isAuthenticated: boolean;
+  currentUser?: {
+    name?: string | null;
+    image?: string | null;
+  } | null;
 }) {
   const router = useRouter();
   const [content, setContent] = useState("");
@@ -24,9 +40,19 @@ export function CommentComposer({
 
   if (!isAuthenticated) {
     return (
-      <Button variant="outline" onClick={() => router.push("/sign-in")}>
-        Sign in to comment
-      </Button>
+      <div className="rounded-xl border border-border/70 bg-card/60 p-4 text-center backdrop-blur-sm">
+        <p className="text-muted-foreground text-sm mb-3">
+          Sign in to join the conversation and comment on this prediction.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/sign-in")}
+          className="rounded-full px-6 text-xs font-medium"
+        >
+          Sign in
+        </Button>
+      </div>
     );
   }
 
@@ -58,6 +84,7 @@ export function CommentComposer({
 
       setContent("");
       router.refresh();
+      window.dispatchEvent(new CustomEvent("wager:comment_added"));
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -66,22 +93,46 @@ export function CommentComposer({
   }
 
   return (
-    <form className="flex flex-col gap-2" onSubmit={handleSubmit} noValidate>
-      <Textarea
-        placeholder="Add a comment…"
-        value={content}
-        maxLength={CONTENT_MAX_LENGTH}
-        onChange={(e) => setContent(e.target.value)}
-        disabled={isSubmitting}
-      />
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-xs">
-          {content.length}/{CONTENT_MAX_LENGTH}
-        </span>
-        <Button type="submit" size="sm" disabled={isSubmitting}>
-          {isSubmitting ? "Posting…" : "Comment"}
-        </Button>
+    <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <Avatar className="size-9 shrink-0">
+          <AvatarImage
+            src={currentUser?.image ?? undefined}
+            alt={currentUser?.name ?? "You"}
+          />
+          <AvatarFallback className="text-xs font-medium">
+            {initials(currentUser?.name ?? "You")}
+          </AvatarFallback>
+        </Avatar>
+
+        <form
+          className="flex min-w-0 flex-1 flex-col gap-2"
+          onSubmit={handleSubmit}
+          noValidate
+        >
+          <Textarea
+            placeholder="Post your comment…"
+            value={content}
+            maxLength={CONTENT_MAX_LENGTH}
+            onChange={(e) => setContent(e.target.value)}
+            disabled={isSubmitting}
+            className="min-h-[72px] resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60"
+          />
+          <div className="flex items-center justify-between border-t border-border/40 pt-2">
+            <span className="text-muted-foreground text-xs">
+              {content.length}/{CONTENT_MAX_LENGTH}
+            </span>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || !content.trim()}
+              className="rounded-full px-5 text-xs font-semibold"
+            >
+              {isSubmitting ? "Posting…" : "Comment"}
+            </Button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 }
