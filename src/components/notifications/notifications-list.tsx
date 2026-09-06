@@ -18,12 +18,13 @@ interface NotificationsPage {
   unreadCount: number;
 }
 
-function initials(name: string) {
+function initials(name?: string | null) {
+  if (!name) return "?";
   return name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 }
 

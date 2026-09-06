@@ -17,12 +17,13 @@ interface CommentsPage {
   nextCursor: string | null;
 }
 
-function initials(name: string) {
+function initials(name?: string | null) {
+  if (!name) return "?";
   return name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 }
 
@@ -234,21 +235,11 @@ export function CommentList({
   const [comments, setComments] = useState(initialPage.items);
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasNewComments, setHasNewComments] = useState(false);
 
   useEffect(() => {
-    const socket = getSocketClient();
-    const room = rooms.post(predictionId);
-    socket.emit("join", room);
-
-    const handleCommentAdded = () => setHasNewComments(true);
-    socket.on("comment_added", handleCommentAdded);
-
-    return () => {
-      socket.emit("leave", room);
-      socket.off("comment_added", handleCommentAdded);
-    };
-  }, [predictionId]);
+    setComments(initialPage.items);
+    setNextCursor(initialPage.nextCursor);
+  }, [initialPage.items, initialPage.nextCursor]);
 
   async function loadFreshComments() {
     try {
@@ -258,10 +249,26 @@ export function CommentList({
         setComments(body.data.items);
         setNextCursor(body.data.nextCursor);
       }
-    } finally {
-      setHasNewComments(false);
+    } catch {
+      // non-critical
     }
   }
+
+  useEffect(() => {
+    const socket = getSocketClient();
+    const room = rooms.post(predictionId);
+    socket.emit("join", room);
+
+    const handleCommentAdded = () => {
+      loadFreshComments();
+    };
+    socket.on("comment_added", handleCommentAdded);
+
+    return () => {
+      socket.emit("leave", room);
+      socket.off("comment_added", handleCommentAdded);
+    };
+  }, [predictionId]);
 
   async function loadMore() {
     if (!nextCursor) return;
@@ -282,15 +289,6 @@ export function CommentList({
 
   return (
     <div className="flex flex-col gap-3">
-      {hasNewComments && (
-        <button
-          onClick={loadFreshComments}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-        >
-          New comments — tap to refresh
-        </button>
-      )}
-
       {comments.length === 0 ? (
         <p className="text-muted-foreground py-6 text-center text-sm">
           No comments yet. Be the first to reply.

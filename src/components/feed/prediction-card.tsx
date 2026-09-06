@@ -10,12 +10,13 @@ import { formatRelativeTime } from "@/lib/format";
 import { MARKET_TYPE_LABEL } from "@/lib/market-labels";
 import type { FeedItem } from "@/lib/queries/feed";
 
-function initials(name: string) {
+function initials(name?: string | null) {
+  if (!name) return "?";
   return name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 }
 

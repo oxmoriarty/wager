@@ -19,12 +19,13 @@ type FieldErrors = Partial<Record<"username" | "displayName" | "bio", string>>;
 type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 type CheckResult = { username: string; available: boolean } | null;
 
-function initials(name: string) {
+function initials(name?: string | null) {
+  if (!name) return "?";
   return name
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 }
 

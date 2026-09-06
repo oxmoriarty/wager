@@ -1,5 +1,10 @@
-export function formatRelativeTime(date: Date) {
-  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+export function formatRelativeTime(
+  date: Date | string | number | null | undefined,
+) {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const seconds = Math.round((Date.now() - d.getTime()) / 1000);
   if (seconds < 60) return "just now";
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}m`;
@@ -10,18 +15,21 @@ export function formatRelativeTime(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-  }).format(date);
+  }).format(d);
 }
 
 /** Absolute kickoff date/time — `formatRelativeTime` is designed for past
  * timestamps (likes, comments) and reads oddly for a future fixture time. */
-export function formatKickoff(date: Date) {
+export function formatKickoff(date: Date | string | number | null | undefined) {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  }).format(d);
 }
 
 /** Formats a Market's pool amount for display. USDC pool fields come out of

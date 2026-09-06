@@ -104,6 +104,7 @@ export async function POST(
         displayName: commentRaw.author.profile?.displayName ?? "",
         avatarUrl: commentRaw.author.profile?.avatarUrl ?? null,
       },
+      replies: [],
     };
 
     emitCommentAdded({

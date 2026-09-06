@@ -37,18 +37,18 @@ type RawAuthor = {
   } | null;
 };
 
-function flattenAuthor(raw: RawAuthor) {
+function flattenAuthor(raw?: RawAuthor | null) {
   return {
-    username: raw.profile?.username ?? "",
-    displayName: raw.profile?.displayName ?? "",
-    avatarUrl: raw.profile?.avatarUrl ?? null,
+    username: raw?.profile?.username ?? "",
+    displayName: raw?.profile?.displayName ?? "Anonymous",
+    avatarUrl: raw?.profile?.avatarUrl ?? null,
   };
 }
 
 export type CommentReply = {
   id: string;
   content: string;
-  createdAt: Date;
+  createdAt: Date | string;
   parentId: string | null;
   author: { username: string; displayName: string; avatarUrl: string | null };
 };
@@ -56,7 +56,7 @@ export type CommentReply = {
 export type CommentRow = {
   id: string;
   content: string;
-  createdAt: Date;
+  createdAt: Date | string;
   parentId: string | null;
   author: { username: string; displayName: string; avatarUrl: string | null };
   replies: CommentReply[];
