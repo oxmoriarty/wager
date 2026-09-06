@@ -7,7 +7,6 @@ import { getPredictionById } from "@/lib/queries/feed";
 import { getCommentsPage } from "@/lib/queries/comments";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
-import { PredictionCard } from "@/components/feed/prediction-card";
 import { ConversationView } from "@/components/feed/conversation-view";
 
 export async function generateMetadata({
@@ -58,17 +57,8 @@ export default async function PredictionDetailPage({
           <ArrowLeft className="size-3.5" />
           Back to feed
         </Link>
-        <PredictionCard
-          prediction={prediction}
-          isAuthenticated={Boolean(session?.user)}
-        />
-
-        {/* Tree vertical connector line from Prediction Post into Conversation */}
-        <div className="relative pl-6 -my-2">
-          <div className="h-4 w-0.5 bg-border/80" />
-        </div>
-
         <ConversationView
+          prediction={prediction}
           predictionId={predictionId}
           initialComments={commentsPage.items}
           totalCount={commentsPage.totalCount}

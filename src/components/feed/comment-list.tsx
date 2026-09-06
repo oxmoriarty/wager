@@ -8,7 +8,6 @@ import {
   ChevronUp,
   CornerDownRight,
   Heart,
-  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -298,7 +297,7 @@ export function CommentList({
 }: {
   predictionId: string;
   comments: CommentNode[];
-  totalCount: number;
+  totalCount?: number;
   isAuthenticated: boolean;
   sortMode?: CommentSortMode;
   onSortChange?: (mode: CommentSortMode) => void;
@@ -306,58 +305,6 @@ export function CommentList({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      {/* Header & Sorting Bar */}
-      <div className="flex items-center justify-between border-b border-border/60 pb-2.5 text-xs">
-        <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-          <MessageCircle className="size-4 text-muted-foreground" />
-          <span>
-            {totalCount} {totalCount === 1 ? "Comment" : "Comments"}
-          </span>
-        </div>
-
-        {/* Sorting controls */}
-        {comments.length > 1 && onSortChange && (
-          <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-0.5 text-[11px]">
-            <button
-              type="button"
-              onClick={() => onSortChange("conversational")}
-              className={cn(
-                "rounded-md px-2 py-1 font-medium transition-colors",
-                sortMode === "conversational"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Oldest
-            </button>
-            <button
-              type="button"
-              onClick={() => onSortChange("latest")}
-              className={cn(
-                "rounded-md px-2 py-1 font-medium transition-colors",
-                sortMode === "latest"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Latest
-            </button>
-            <button
-              type="button"
-              onClick={() => onSortChange("likes")}
-              className={cn(
-                "rounded-md px-2 py-1 font-medium transition-colors",
-                sortMode === "likes"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Top Liked
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Tree Content */}
       {comments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-8 text-center">

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
@@ -6,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LikeButton } from "@/components/feed/like-button";
 import { RepostButton } from "@/components/feed/repost-button";
+import { ShareButton } from "@/components/feed/share-button";
 import { formatRelativeTime } from "@/lib/format";
 import { MARKET_TYPE_LABEL } from "@/lib/market-labels";
+import { cn } from "@/lib/utils";
 import type { FeedItem } from "@/lib/queries/feed";
+import type { CommentSortMode } from "@/lib/queries/comments";
 
 function initials(name?: string | null) {
   if (!name) return "?";
@@ -23,9 +28,15 @@ function initials(name?: string | null) {
 export function PredictionCard({
   prediction,
   isAuthenticated,
+  sortMode,
+  onSortChange,
+  commentsCountOverride,
 }: {
   prediction: FeedItem;
   isAuthenticated: boolean;
+  sortMode?: CommentSortMode;
+  onSortChange?: (mode: CommentSortMode) => void;
+  commentsCountOverride?: number;
 }) {
   const { author, market } = prediction;
 
@@ -111,26 +122,74 @@ export function PredictionCard({
             );
           })()}
 
-          <div className="text-muted-foreground flex items-center gap-5 pt-1 text-xs">
-            <LikeButton
-              predictionId={prediction.id}
-              isAuthenticated={isAuthenticated}
-              initialLiked={prediction.isLikedByViewer}
-              initialCount={prediction._count.likes}
-            />
-            <Link
-              href={`/${author.username}/${prediction.id}`}
-              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-            >
-              <MessageCircle className="size-4" />
-              {prediction._count.comments.toLocaleString()}
-            </Link>
-            <RepostButton
-              predictionId={prediction.id}
-              isAuthenticated={isAuthenticated}
-              initialReposted={prediction.isRepostedByViewer}
-              initialCount={prediction._count.reposts}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+            <div className="text-muted-foreground flex items-center gap-4 sm:gap-5">
+              <LikeButton
+                predictionId={prediction.id}
+                isAuthenticated={isAuthenticated}
+                initialLiked={prediction.isLikedByViewer}
+                initialCount={prediction._count.likes}
+              />
+              <Link
+                href={`/${author.username}/${prediction.id}`}
+                className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+              >
+                <MessageCircle className="size-4" />
+                {(commentsCountOverride ?? prediction._count.comments).toLocaleString()}
+              </Link>
+              <RepostButton
+                predictionId={prediction.id}
+                isAuthenticated={isAuthenticated}
+                initialReposted={prediction.isRepostedByViewer}
+                initialCount={prediction._count.reposts}
+              />
+              <ShareButton
+                username={author.username}
+                predictionId={prediction.id}
+              />
+            </div>
+
+            {/* Filter buttons on the bottom right (Oldest, Latest, Top Liked) */}
+            {onSortChange && (
+              <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-0.5 text-[11px] ml-auto">
+                <button
+                  type="button"
+                  onClick={() => onSortChange("conversational")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition-colors",
+                    sortMode === "conversational"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Oldest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSortChange("latest")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition-colors",
+                    sortMode === "latest"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Latest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSortChange("likes")}
+                  className={cn(
+                    "rounded-md px-2 py-1 font-medium transition-colors",
+                    sortMode === "likes"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Top Liked
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

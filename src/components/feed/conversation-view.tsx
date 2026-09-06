@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { getSocketClient } from "@/lib/socket/client";
 import { rooms } from "@/lib/socket/events";
 import type { CommentNode, CommentSortMode } from "@/lib/queries/comments";
+import type { FeedItem } from "@/lib/queries/feed";
+import { PredictionCard } from "@/components/feed/prediction-card";
 import {
   CommentComposer,
   type ReplyTarget,
@@ -31,12 +33,14 @@ function insertReplyIntoTree(
 }
 
 export function ConversationView({
+  prediction,
   predictionId,
   initialComments,
   totalCount,
   isAuthenticated,
   currentUser,
 }: {
+  prediction: FeedItem;
   predictionId: string;
   initialComments: CommentNode[];
   totalCount: number;
@@ -128,15 +132,27 @@ export function ConversationView({
   }, [predictionId, sortMode]);
 
   return (
-    <div className="flex flex-col gap-5 pb-28 sm:pb-32">
-      {/* ── Threaded Reply Tree (Rendered right under the post) ── */}
+    <div className="flex flex-col gap-4 pb-28 sm:pb-32">
+      {/* ── Main Prediction Post with Filter Controls on Bottom Right ── */}
+      <PredictionCard
+        prediction={prediction}
+        isAuthenticated={isAuthenticated}
+        sortMode={sortMode}
+        onSortChange={handleSortChange}
+        commentsCountOverride={count}
+      />
+
+      {/* ── Vertical Connector Line from Post into Conversation ── */}
+      <div className="relative pl-6 -my-2">
+        <div className="h-4 w-0.5 bg-border/80" />
+      </div>
+
+      {/* ── Threaded Reply Tree ── */}
       <CommentList
         predictionId={predictionId}
         comments={comments}
         totalCount={count}
         isAuthenticated={isAuthenticated}
-        sortMode={sortMode}
-        onSortChange={handleSortChange}
         onSelectReply={handleSelectReply}
       />
 

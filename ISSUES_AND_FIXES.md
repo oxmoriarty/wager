@@ -324,6 +324,27 @@ This document provides a comprehensive technical log of all bugs, architecture c
 
 ---
 
+## 15. Comment Count Header Removal, Bottom-Right Post Filter Controls & Post Link Sharing
+
+### Issue
+- An intermediate bar displaying comment count (`💬 6 Comments`) and sorting buttons was positioned between the post card and comments tree, breaking the visual connection from the prediction card into the threaded conversation.
+- Users had no direct way to copy and share a link to a prediction post from cards on the feed or detail pages.
+
+### Resolution
+- **Removed Intermediate Header Bar**:
+  - Eliminated the redundant comment count header and border divider between the prediction post and comments tree in `CommentList`.
+  - The vertical conversation connector line now flows uninterrupted directly from the bottom of the prediction post into the threaded reply tree.
+- **Relocated Filter Controls to Post Box Bottom Right**:
+  - Integrated `Oldest`, `Latest`, and `Top Liked` sorting buttons directly into the bottom right of `PredictionCard`.
+  - Positioned flexibly with `flex-wrap items-center justify-between` and `ml-auto` so action icons remain left-aligned and sort buttons anchor neatly to the right.
+  - Linked post-level comment counter (`💬 {count}`) reactively to live conversation updates (`commentsCountOverride`).
+- **Post Link Share Icon (`ShareButton`)**:
+  - Added a dedicated `ShareButton` beside the repost button across all `PredictionCard` instances.
+  - Implemented one-click clipboard copying with fallback for non-secure contexts (`navigator.clipboard` and `document.execCommand`).
+  - Swaps the `Share` icon with a `Check` icon for 2 seconds and triggers an instant toast notification: `Post link copied to clipboard!`.
+
+---
+
 ## Verification & Deployment Summary
 
 | Check | Tool / Command | Result |
