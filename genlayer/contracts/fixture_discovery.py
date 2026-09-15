@@ -24,11 +24,6 @@ import typing
 
 MATCH_RESULT = "MATCH_RESULT"
 
-# Consensus is accepted if independent validator extraction overlaps the
-# leader's by at least this fraction (Jaccard similarity over the set of
-# (home, away, kickoff) tuples). See `validator_fn` in `discover_fixtures`.
-MIN_FIXTURE_SET_SIMILARITY = 0.8
-
 # Web content is truncated before being embedded in the LLM prompt to keep
 # prompts bounded regardless of source page size.
 MAX_PAGE_CHARS = 15000
@@ -124,7 +119,7 @@ class FixtureDiscovery(gl.Contract):
         if not source_url:
             raise gl.vm.UserError("source_url must not be empty")
 
-        def leader_fn():
+        def extract_fixtures():
             page_text = gl.nondet.web.render(
                 source_url, mode="text", wait_after_loaded="3s"
             )
@@ -160,43 +155,25 @@ Respond using ONLY the following JSON format, nothing else:
                 raise gl.vm.UserError(
                     "LLM did not return the expected {fixtures: [...]} structure"
                 )
-            return result
+            return json.dumps(result, sort_keys=True)
 
-        def normalize(entry: dict) -> tuple[str, str, str]:
-            home = str(entry.get("home_team", "")).strip().lower()
-            away = str(entry.get("away_team", "")).strip().lower()
-            kickoff = str(entry.get("kickoff_iso", "")).strip()
-            return (home, away, kickoff)
+        COMPARISON_PRINCIPLE = (
+            "The extracted fixture sets must represent the same football "
+            "matches. Team names should be considered equivalent if they "
+            "refer to the same club (e.g. 'Man City' and 'Manchester City', "
+            "'Spurs' and 'Tottenham Hotspur'). Kickoff times should be "
+            "considered equivalent if they represent the same moment in time "
+            "regardless of timezone format (e.g. '+00:00' vs 'Z'). Minor "
+            "differences in the total number of fixtures (plus or minus one) "
+            "are acceptable. The core set of matches must substantially "
+            "overlap."
+        )
 
-        def validator_fn(leaders_res) -> bool:
-            if not isinstance(leaders_res, gl.vm.Return):
-                # Leader errored (unreachable source, malformed LLM output,
-                # etc). Disagree so the network rotates to a new leader,
-                # rather than agreeing on a broken/empty result.
-                return False
-
-            leader_data = leaders_res.calldata
-            if not isinstance(leader_data, dict) or not isinstance(
-                leader_data.get("fixtures"), list
-            ):
-                return False
-
-            my_result = leader_fn()
-
-            leader_set = {normalize(f) for f in leader_data["fixtures"]}
-            my_set = {normalize(f) for f in my_result["fixtures"]}
-
-            if len(leader_set) == 0 and len(my_set) == 0:
-                return True
-            if len(leader_set) == 0 or len(my_set) == 0:
-                return False
-
-            overlap = leader_set & my_set
-            union = leader_set | my_set
-            similarity = len(overlap) / len(union)
-            return similarity >= MIN_FIXTURE_SET_SIMILARITY
-
-        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        result_str = gl.eq_principle.prompt_comparative(
+            extract_fixtures,
+            principle=COMPARISON_PRINCIPLE,
+        )
+        result = json.loads(result_str)
 
         created_count = 0
         now_iso = datetime.now(timezone.utc).isoformat()

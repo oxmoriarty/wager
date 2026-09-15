@@ -15,11 +15,12 @@ Intelligent Contracts for Wager's decentralized intelligence layer
 
 Discovers upcoming fixtures for a competition from a trusted web source,
 extracts them via LLM inside a non-deterministic block, reaches
-validator consensus on the extracted set (Jaccard similarity ≥ 0.8 over
-`(home_team, away_team, kickoff_iso)` tuples — tolerates minor wording
-differences between validators' independent extractions without
-accepting a genuinely different fixture set), then stores each new
-fixture and opens a canonical `MATCH_RESULT` market for it.
+validator consensus using `prompt_comparative` (GenLayer's built-in
+comparative equivalence — an LLM cross-checks the leader's and
+validator's independent extractions using a principle that tolerates
+team name variations, timezone format differences, and minor fixture
+count differences), then stores each new fixture and opens a canonical
+`MATCH_RESULT` market for it.
 
 This is the real implementation of what `prisma/seed.ts` (in the
 Next.js app) has stood in for since Phase 3. Once this contract is
@@ -36,16 +37,16 @@ deployed and a backend sync job reads its output into the `Match`/
 
 ### Consensus design notes
 
-- `discover_fixtures` uses `gl.vm.run_nondet_unsafe` with a custom
-  `validator_fn`, not `strict_eq` — LLM extraction is inherently
-  non-deterministic (wording, ordering), so exact-match consensus
-  would never agree. See the GenLayer docs' Equivalence Principle
-  page for why.
-- The validator **disagrees** (forcing a leader rotation) on: leader
-  errors, malformed leader output, or a fixture set with insufficient
-  overlap with its own independent extraction. It only **agrees** when
-  the two extractions are the same set or reasonably close to it, or
-  when both find zero fixtures.
+- `discover_fixtures` uses `gl.eq_principle.prompt_comparative`, GenLayer's
+  built-in comparative equivalence. Both leader and validators independently
+  fetch the source page and extract fixtures via LLM. An LLM comparison
+  prompt then cross-checks the two results using a defined principle that
+  tolerates minor team name variations (e.g. "Man City" vs "Manchester
+  City"), timezone format differences ("+00:00" vs "Z"), and ±1 fixture
+  count differences.
+- This replaces the earlier `run_nondet_unsafe` + Jaccard similarity
+  approach, which failed on small fixture sets and couldn't handle
+  semantic equivalence of team names or time formats.
 - Duplicate fixtures (same competition/teams/kickoff, from a prior
   discovery run) are silently skipped, not treated as an error —
   running discovery repeatedly against the same source is expected
