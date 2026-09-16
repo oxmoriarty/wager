@@ -7,6 +7,7 @@ import {
   getGenLayerClient,
   getFixtureDiscoveryAddress,
   getMatchMonitoringAddress,
+  isSuccessful,
 } from "./client";
 
 // Matches in any of these statuses can still change (a scheduled match
@@ -94,10 +95,18 @@ export async function syncMatchStatusesFromGenLayer() {
       value: BigInt(0),
     });
 
-    await client.waitForTransactionReceipt({
+    const receipt = await client.waitForTransactionReceipt({
       hash: txHash,
       status: TransactionStatus.FINALIZED,
     });
+
+    if (!isSuccessful(receipt)) {
+      console.error(
+        `Match Monitoring check_match transaction ${txHash} did not execute successfully for ${match.externalId} ` +
+          `(status: ${receipt.statusName ?? receipt.status}, result: ${receipt.txExecutionResultName ?? receipt.txExecutionResult})`,
+      );
+      continue;
+    }
 
     const state = (await client.readContract({
       address: matchMonitoringAddress,

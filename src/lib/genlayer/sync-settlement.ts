@@ -17,6 +17,7 @@ import {
   getGenLayerClient,
   getFixtureDiscoveryAddress,
   getSettlementContractAddress,
+  isSuccessful,
 } from "./client";
 
 /**
@@ -176,10 +177,19 @@ export async function syncSettlementsFromGenLayer() {
         value: BigInt(0),
       });
 
-      await client.waitForTransactionReceipt({
+      const receipt = await client.waitForTransactionReceipt({
         hash: txHash,
         status: TransactionStatus.FINALIZED,
       });
+
+      if (!isSuccessful(receipt)) {
+        console.error(
+          `Settlement settle_market transaction ${txHash} did not execute successfully for ${match.externalId} ` +
+            `(status: ${receipt.statusName ?? receipt.status}, result: ${receipt.txExecutionResultName ?? receipt.txExecutionResult})`,
+        );
+        skippedCount += 1;
+        continue;
+      }
 
       // Read back the consensus'd settlement decision
       const settlement = (await client.readContract({

@@ -1,7 +1,11 @@
 import { TransactionStatus } from "genlayer-js/types";
 
 import { prisma } from "@/lib/prisma";
-import { getGenLayerClient, getFixtureDiscoveryAddress } from "./client";
+import {
+  getGenLayerClient,
+  getFixtureDiscoveryAddress,
+  isSuccessful,
+} from "./client";
 
 interface ContractFixture {
   fixture_id: string;
@@ -41,10 +45,17 @@ export async function syncFixturesFromGenLayer(
     value: BigInt(0),
   });
 
-  await client.waitForTransactionReceipt({
+  const receipt = await client.waitForTransactionReceipt({
     hash: txHash,
     status: TransactionStatus.FINALIZED,
   });
+
+  if (!isSuccessful(receipt)) {
+    throw new Error(
+      `GenLayer discover_fixtures transaction ${txHash} did not execute successfully ` +
+        `(status: ${receipt.statusName ?? receipt.status}, result: ${receipt.txExecutionResultName ?? receipt.txExecutionResult})`,
+    );
+  }
 
   const fixtureIds = (await client.readContract({
     address,

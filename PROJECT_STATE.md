@@ -5,14 +5,15 @@
 
 # Current Version
 
-v1.8.0
+v1.9.0
 
 # Project Status
 
-Overall Progress: ~97% (Phases 1–7 complete: all contracts, backend
-pipeline, claim UI, admin auth, Rewards integration, and profile/wallet
-stats implemented. Build is clean (0 errors). Only contract deployment,
-live E2E validation, and production scheduling remain.)
+Overall Progress: ~99% (Phases 1–8 complete: all contracts, backend
+pipeline, claim UI, admin auth, Rewards integration, profile/wallet
+stats, and GenLayer Studio Next / Consensus v0.6 migration implemented.
+Build is clean (0 errors, 30 routes + API routes compiled). Ready for
+contract deployment on Studio Next and hackathon submission.)
 
 ## Completed
 
@@ -220,6 +221,18 @@ Schema location: `prisma/schema.prisma`
 
 _All prior changelog entries from v1.5.0 and v1.6.0 remain valid and
 unchanged — see the git history or prior versions of this file._
+
+- **Phase 8 — GenLayer Studio Next & Consensus v0.6 Migration (v1.9.0)**:
+  - `package.json` — upgraded `genlayer-js` to `2.0.0-rc.1`, added `@genlayer/transaction-kit@0.1.0-rc.2` and `@genlayer/transaction-kit-react@0.1.0-rc.2`
+  - `src/lib/genlayer/network.ts` — new: canonical Studio Next configuration (`studioDevnet` preset, chain ID `61997`, RPC `https://studio-next.genlayer.com/api`, explorer `https://explorer-studio-dev.genlayer.com/`)
+  - `src/lib/genlayer/kit.ts` — new: `useTransactionKit` hook wrapper for React
+  - `src/lib/genlayer/client.ts` — changed: updated `getGenLayerClient()` to use `GENLAYER_CHAIN` (Studio Next), exported `isSuccessful`
+  - `src/lib/genlayer/sync-fixtures.ts` — changed: updated transaction verification to enforce `isSuccessful(receipt)`
+  - `src/lib/genlayer/sync-match-status.ts` — changed: updated transaction verification to enforce `isSuccessful(receipt)`
+  - `src/lib/genlayer/sync-settlement.ts` — changed: updated transaction verification to enforce `isSuccessful(receipt)`
+  - `genlayer/README.md` — changed: added Studio Next deployment instructions (`genlayer network studio-dev`)
+  - `.env.example` — changed: defaulted GenLayer RPC to Studio Next and chain ID to 61997
+  - `HACKATHON_SUBMISSION.md` — new: comprehensive submission package answering all portal review criteria, demo video script, and judge verification guide
 
 - **Phase 7 — Rewards Backend Integration (v1.8.0)**:
   - `src/lib/arc/config.ts` — changed: added `getRewardsContractAddress()`

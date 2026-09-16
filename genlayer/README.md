@@ -196,28 +196,45 @@ via `direct_vm.run_validator()`.
 > explicitly to work around this — remove the pin once a newer
 > `genlayer-test` release fixes its own version resolution.
 
-## Deploying to Bradbury Testnet
+## Deploying to Studio Next (Agent Tank Hackathon)
 
-Prerequisites: a funded Bradbury Testnet account (faucet:
-https://testnet-faucet.genlayer.foundation) and the GenLayer CLI
-(`npm install -g genlayer`).
+Per the **GenLayer Agent Tank Hackathon** rules, projects must be deployed on **Studio Next** (Consensus v0.6).
+
+Prerequisites: GenLayer CLI (`npm install -g genlayer@latest` or `genlayer@0.40.0-rc.1`).
 
 ```bash
-genlayer network testnet-bradbury
+# Point GenLayer CLI to Studio Next (studio-dev alias)
+genlayer network studio-dev
+
+# Deploy the 3 Intelligent Contracts
 genlayer deploy --contract contracts/fixture_discovery.py
 genlayer deploy --contract contracts/match_monitoring.py
 genlayer deploy --contract contracts/settlement.py
 ```
 
-Save each deployed contract address into the Next.js app's
-`.env` — `GENLAYER_FIXTURE_DISCOVERY_CONTRACT_ADDRESS`,
-`GENLAYER_MATCH_MONITORING_CONTRACT_ADDRESS`, and
-`GENLAYER_SETTLEMENT_CONTRACT_ADDRESS` respectively (see
-`wager/.env.example`). If the same operator account will call all
-contracts, add it as an operator on each separately — operator lists
-are per-contract, not shared.
+Save each deployed contract address into the Next.js app's `.env` (or Vercel Environment Variables):
+- `GENLAYER_FIXTURE_DISCOVERY_CONTRACT_ADDRESS`
+- `GENLAYER_MATCH_MONITORING_CONTRACT_ADDRESS`
+- `GENLAYER_SETTLEMENT_CONTRACT_ADDRESS`
 
-### Bradbury network details
+If using a separate backend operator account to execute scheduled syncs, add it as an operator on each contract:
+```bash
+genlayer write --contract <fixture_discovery_address> --method add_operator --args "<operator_address>"
+genlayer write --contract <match_monitoring_address> --method add_operator --args "<operator_address>"
+genlayer write --contract <settlement_address> --method add_operator --args "<operator_address>"
+```
+
+### Studio Next network details
+
+| Setting          | Value                                       |
+| ---------------- | ------------------------------------------- |
+| Network Name     | GenLayer Studio Next                        |
+| GenLayer RPC     | `https://studio-next.genlayer.com/api`      |
+| Chain ID         | 61997                                       |
+| Explorer         | https://explorer-studio-dev.genlayer.com/   |
+| Consensus Engine | Consensus v0.6                              |
+
+### Bradbury Testnet (Alternative Network)
 
 | Setting      | Value                                      |
 | ------------ | ------------------------------------------ |
