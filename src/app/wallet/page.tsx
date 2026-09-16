@@ -10,8 +10,7 @@ import {
 } from "@/lib/queries/wallet";
 import { AppHeader } from "@/components/layout/app-header";
 import { WalletCard } from "@/components/wallet/wallet-card";
-import { PositionsList } from "@/components/wallet/positions-list";
-import { TransactionsList } from "@/components/wallet/transactions-list";
+import { WalletTabs } from "@/components/wallet/wallet-tabs";
 
 export const metadata: Metadata = { title: "Wallet" };
 
@@ -37,19 +36,10 @@ export default async function WalletPage() {
 
         <WalletCard overview={overview} rewardsStats={rewardsStats} />
 
-        <div className="flex flex-col gap-3">
-          <h2 className="text-foreground text-sm font-semibold tracking-wide uppercase">
-            Positions
-          </h2>
-          <PositionsList positions={positions} />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <h2 className="text-foreground text-sm font-semibold tracking-wide uppercase">
-            Transaction history
-          </h2>
-          <TransactionsList items={transactionsPage.items} />
-        </div>
+        <WalletTabs
+          positions={positions}
+          transactions={transactionsPage.items}
+        />
       </main>
     </>
   );

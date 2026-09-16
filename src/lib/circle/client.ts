@@ -275,3 +275,58 @@ export async function findClaimTransactionHash(params: {
 
   return null;
 }
+
+/**
+ * Starts a challenge to transfer native USDC on Arc Testnet to an external address.
+ * `amount` is a human-readable decimal string (e.g. "10.00").
+ */
+export async function createWithdrawChallenge(params: {
+  userId: string;
+  walletId: string;
+  destinationAddress: string;
+  amount: string;
+}): Promise<{ challengeId: string }> {
+  const result = await getCircleClient().createTransaction({
+    userId: params.userId,
+    walletId: params.walletId,
+    destinationAddress: params.destinationAddress,
+    amounts: [params.amount],
+    fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+  });
+
+  const challengeId = result.data?.challengeId;
+  if (!challengeId) {
+    throw new Error(
+      "Circle did not return a challengeId for the withdrawal transaction.",
+    );
+  }
+
+  return { challengeId };
+}
+
+/**
+ * Locates the transaction hash for a withdrawal transfer just completed.
+ */
+export async function findWithdrawTransactionHash(params: {
+  userId: string;
+  walletId: string;
+  destinationAddress: string;
+}): Promise<string | null> {
+  const result = await getCircleClient().listTransactions({
+    userId: params.userId,
+    walletIds: [params.walletId],
+    destinationAddress: params.destinationAddress,
+    order: "DESC",
+  });
+
+  const transactions = result.data?.transactions ?? [];
+
+  for (const tx of transactions) {
+    if (!tx.txHash) continue;
+    if (tx.state !== "CONFIRMED" && tx.state !== "COMPLETE") continue;
+    return tx.txHash;
+  }
+
+  return null;
+}
+

@@ -31,3 +31,19 @@ export const claimChallengeSchema = z.object({
 export const claimConfirmSchema = z.object({
   marketId: z.string().min(1),
 });
+
+export const withdrawChallengeSchema = z.object({
+  destinationAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, "Enter a valid 0x wallet address"),
+  amount: usdcAmountSchema,
+});
+
+export const withdrawConfirmSchema = z.object({
+  destinationAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, "Enter a valid 0x wallet address"),
+  amount: usdcAmountSchema,
+  txHash: z.string().optional(),
+});
+
