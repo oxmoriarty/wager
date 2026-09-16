@@ -45,10 +45,22 @@ export async function POST() {
     });
 
     return apiSuccess({ arcWalletAddress: wallet.address });
-  } catch (error) {
-    console.error("Failed to confirm wallet setup:", error);
+  } catch (error: unknown) {
+    const err = error as {
+      message?: string;
+      status?: number;
+      code?: number;
+      stack?: string;
+    };
+    console.error("Failed to confirm wallet setup:", {
+      message: err?.message,
+      status: err?.status,
+      code: err?.code,
+      stack: err?.stack,
+    });
     return apiError(
-      "Something went wrong confirming your wallet. Please try again.",
+      err?.message ||
+        "Something went wrong confirming your wallet. Please try again.",
       500,
       "INTERNAL_ERROR",
     );

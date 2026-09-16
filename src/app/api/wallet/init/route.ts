@@ -97,10 +97,22 @@ export async function POST() {
       encryptionKey,
       challengeId,
     });
-  } catch (error) {
-    console.error("Failed to initialize wallet:", error);
+  } catch (error: unknown) {
+    const err = error as {
+      message?: string;
+      status?: number;
+      code?: number;
+      stack?: string;
+    };
+    console.error("Failed to initialize wallet:", {
+      message: err?.message,
+      status: err?.status,
+      code: err?.code,
+      stack: err?.stack,
+    });
     return apiError(
-      "Something went wrong setting up your wallet. Please try again.",
+      err?.message ||
+        "Something went wrong setting up your wallet. Please try again.",
       500,
       "INTERNAL_ERROR",
     );

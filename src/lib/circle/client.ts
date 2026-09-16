@@ -47,10 +47,24 @@ export function getCircleClient(): CircleUserControlledWalletsClient {
 export async function ensureCircleUser(userId: string): Promise<void> {
   try {
     await getCircleClient().createUser({ userId });
-  } catch (error) {
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
-    if (status === 409) {
+  } catch (error: unknown) {
+    const err = error as {
+      status?: number;
+      code?: number;
+      message?: string;
+      response?: { status?: number };
+    };
+    const status = err?.status ?? err?.response?.status;
+    const code = err?.code;
+    const message = String(err?.message || "").toLowerCase();
+
+    // Circle returns 409 (code 155101) when a user already exists
+    if (
+      status === 409 ||
+      code === 155101 ||
+      message.includes("already created") ||
+      message.includes("already exists")
+    ) {
       return;
     }
     throw error;
