@@ -184,15 +184,19 @@ export async function findStakeTransactionHash(params: {
   const result = await getCircleClient().listTransactions({
     userId: params.userId,
     walletIds: [params.walletId],
-    destinationAddress: getEscrowContractAddress(),
     order: "DESC",
   });
 
   const transactions = result.data?.transactions ?? [];
+  const escrowAddress = getEscrowContractAddress().toLowerCase();
 
   for (const tx of transactions) {
     if (!tx.txHash) continue;
-    if (tx.state !== "CONFIRMED" && tx.state !== "COMPLETE") continue;
+    if (tx.state === "FAILED" || tx.state === "CANCELLED") continue;
+
+    const target = (tx.contractAddress || tx.destinationAddress || "").toLowerCase();
+    if (target && target !== escrowAddress) continue;
+
     if (tx.abiFunctionSignature !== "stake(bytes32,uint8)") continue;
 
     const [marketIdParam, sideParam] = tx.abiParameters ?? [];
@@ -252,15 +256,19 @@ export async function findClaimTransactionHash(params: {
   const result = await getCircleClient().listTransactions({
     userId: params.userId,
     walletIds: [params.walletId],
-    destinationAddress: getEscrowContractAddress(),
     order: "DESC",
   });
 
   const transactions = result.data?.transactions ?? [];
+  const escrowAddress = getEscrowContractAddress().toLowerCase();
 
   for (const tx of transactions) {
     if (!tx.txHash) continue;
-    if (tx.state !== "CONFIRMED" && tx.state !== "COMPLETE") continue;
+    if (tx.state === "FAILED" || tx.state === "CANCELLED") continue;
+
+    const target = (tx.contractAddress || tx.destinationAddress || "").toLowerCase();
+    if (target && target !== escrowAddress) continue;
+
     if (tx.abiFunctionSignature !== "claim(bytes32)") continue;
 
     const [marketIdParam] = tx.abiParameters ?? [];

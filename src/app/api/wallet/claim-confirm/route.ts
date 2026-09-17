@@ -62,11 +62,16 @@ export async function POST(request: Request) {
   const onChainMarketId = toOnChainMarketId(marketId);
 
   try {
-    const txHash = await findClaimTransactionHash({
-      userId,
-      walletId: user.circleWalletId,
-      onChainMarketId,
-    });
+    let txHash: string | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      txHash = await findClaimTransactionHash({
+        userId,
+        walletId: user.circleWalletId,
+        onChainMarketId,
+      });
+      if (txHash) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
 
     if (!txHash) {
       return apiError(
@@ -77,9 +82,20 @@ export async function POST(request: Request) {
     }
 
     const publicClient = getArcPublicClient();
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: txHash as `0x${string}`,
-    });
+    let receipt;
+    try {
+      receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+        timeout: 30_000,
+      });
+    } catch (receiptErr) {
+      console.warn("waitForTransactionReceipt timed out or pending:", receiptErr);
+      return apiError(
+        "Your claim transaction has been submitted to Arc Testnet and is still being mined. Please try again in a moment.",
+        409,
+        "TRANSACTION_PENDING",
+      );
+    }
 
     if (receipt.status !== "success") {
       return apiError(
@@ -106,7 +122,7 @@ export async function POST(request: Request) {
 
     const eventMatches =
       claimedEvent &&
-      claimedEvent.args.marketId === onChainMarketId &&
+      claimedEvent.args.marketId.toLowerCase() === onChainMarketId.toLowerCase() &&
       getAddress(claimedEvent.args.staker) ===
         getAddress(user.arcWalletAddress);
 
@@ -170,8 +186,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Failed to confirm claim:", error);
+    const msg = error instanceof Error ? error.message : String(error);
     return apiError(
-      "Something went wrong recording your claim. Please try again.",
+      `Failed to record claim: ${msg}`,
       500,
       "INTERNAL_ERROR",
     );

@@ -1,4 +1,5 @@
 import { getAddress, parseEventLogs, parseUnits } from "viem";
+import { Prisma } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -66,25 +67,42 @@ export async function POST(request: Request) {
   const sideIndex = CONTRACT_SIDE[side];
 
   try {
-    const txHash = await findStakeTransactionHash({
-      userId,
-      walletId: user.circleWalletId,
-      onChainMarketId,
-      sideIndex,
-    });
+    // Retry finding the transaction from Circle (up to 5 attempts, 1.5s delay)
+    let txHash: string | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      txHash = await findStakeTransactionHash({
+        userId,
+        walletId: user.circleWalletId,
+        onChainMarketId,
+        sideIndex,
+      });
+      if (txHash) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
 
     if (!txHash) {
       return apiError(
-        "We couldn't find your transaction yet — it may still be confirming. Please try again in a moment.",
+        "We couldn't find your transaction yet — it may still be confirming with Circle. Please try again in a moment.",
         409,
         "TRANSACTION_NOT_FOUND",
       );
     }
 
     const publicClient = getArcPublicClient();
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: txHash as `0x${string}`,
-    });
+    let receipt;
+    try {
+      receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+        timeout: 30_000,
+      });
+    } catch (receiptErr) {
+      console.warn("waitForTransactionReceipt timed out or pending:", receiptErr);
+      return apiError(
+        "Your transaction has been submitted to Arc Testnet and is still being mined. Please try again in a moment.",
+        409,
+        "TRANSACTION_PENDING",
+      );
+    }
 
     if (receipt.status !== "success") {
       return apiError(
@@ -115,7 +133,7 @@ export async function POST(request: Request) {
     );
     const eventMatches =
       stakedEvent &&
-      stakedEvent.args.marketId === onChainMarketId &&
+      stakedEvent.args.marketId.toLowerCase() === onChainMarketId.toLowerCase() &&
       getAddress(stakedEvent.args.staker) ===
         getAddress(user.arcWalletAddress) &&
       Number(stakedEvent.args.side) === sideIndex &&
@@ -141,6 +159,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const decimalAmount = new Prisma.Decimal(amount);
+
     const market = await prisma.$transaction(async (tx) => {
       await tx.position.upsert({
         where: { userId_marketId: { userId, marketId } },
@@ -148,11 +168,11 @@ export async function POST(request: Request) {
           userId,
           marketId,
           side,
-          amount,
+          amount: decimalAmount,
           arcEscrowTxHash: txHash,
         },
         update: {
-          amount: { increment: amount },
+          amount: { increment: decimalAmount },
           arcEscrowTxHash: txHash,
         },
       });
@@ -162,7 +182,7 @@ export async function POST(request: Request) {
           userId,
           type: "ESCROW_LOCK",
           status: "CONFIRMED",
-          amount,
+          amount: decimalAmount,
           arcTxHash: txHash,
         },
       });
@@ -171,8 +191,8 @@ export async function POST(request: Request) {
         where: { id: marketId },
         data:
           side === "SUPPORT"
-            ? { totalSupportAmount: { increment: amount } }
-            : { totalChallengeAmount: { increment: amount } },
+            ? { totalSupportAmount: { increment: decimalAmount } }
+            : { totalChallengeAmount: { increment: decimalAmount } },
         select: {
           id: true,
           totalSupportAmount: true,
@@ -194,8 +214,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Failed to confirm stake:", error);
+    const msg = error instanceof Error ? error.message : String(error);
     return apiError(
-      "Something went wrong recording your stake. Please try again.",
+      `Failed to record stake: ${msg}`,
       500,
       "INTERNAL_ERROR",
     );
