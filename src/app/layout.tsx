@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   },
   description:
     "Wager is a social football prediction platform. Every post is a prediction.",
+  icons: {
+    icon: "/WagerFavicon.svg",
+    shortcut: "/WagerFavicon.svg",
+    apple: "/WagerFavicon.svg",
+  },
 };
 
 export default async function RootLayout({

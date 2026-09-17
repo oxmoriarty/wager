@@ -286,10 +286,33 @@ export async function createWithdrawChallenge(params: {
   destinationAddress: string;
   amount: string;
 }): Promise<{ challengeId: string }> {
+  // Query wallet token balance to find the native USDC tokenId
+  let tokenId: string | undefined;
+  try {
+    const balancesResult = await getCircleClient().getWalletTokenBalance({
+      userId: params.userId,
+      walletId: params.walletId,
+    });
+    const tokenBalances = balancesResult.data?.tokenBalances ?? [];
+    const nativeToken =
+      tokenBalances.find(
+        (b) => b.token?.isNative && b.token?.symbol === "USDC",
+      ) ?? tokenBalances.find((b) => b.token?.symbol === "USDC");
+    tokenId = nativeToken?.token?.id;
+  } catch (err) {
+    console.warn("Could not query token balance for tokenId, falling back:", err);
+  }
+
+  // Canonical Arc Testnet native USDC token ID
+  if (!tokenId) {
+    tokenId = "15dc2b5d-0994-58b0-bf8c-3a0501148ee8";
+  }
+
   const result = await getCircleClient().createTransaction({
     userId: params.userId,
     walletId: params.walletId,
     destinationAddress: params.destinationAddress,
+    tokenId,
     amounts: [params.amount],
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },
   });

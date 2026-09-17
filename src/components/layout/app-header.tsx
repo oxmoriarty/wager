@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { WagerLogo } from "@/components/ui/wager-logo";
 
 const getHeaderProfile = cache(async (userId: string) => {
   return prisma.profile.findUnique({
@@ -68,9 +69,9 @@ export async function AppHeader() {
       <Link
         href="/"
         prefetch={true}
-        className="text-foreground text-lg font-semibold tracking-tight"
+        className="flex items-center gap-2 transition-opacity hover:opacity-90"
       >
-        Wager
+        <WagerLogo size="sm" />
       </Link>
 
       {profile ? (

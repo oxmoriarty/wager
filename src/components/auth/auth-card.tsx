@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardTitle,
 } from "@/components/ui/card";
+import { WagerLogo } from "@/components/ui/wager-logo";
 
 export function AuthCard({
   title,
@@ -22,12 +23,9 @@ export function AuthCard({
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
-        <Link
-          href="/"
-          className="text-foreground mb-8 block text-center text-lg font-semibold tracking-tight"
-        >
-          Wager
-        </Link>
+        <div className="mb-8 flex justify-center">
+          <WagerLogo size="md" href="/" priority />
+        </div>
         <Card className="gap-6">
           <div className="flex flex-col gap-1.5 text-center">
             <CardTitle className="text-xl">{title}</CardTitle>

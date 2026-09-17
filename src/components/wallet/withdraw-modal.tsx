@@ -32,8 +32,9 @@ export function WithdrawModal({
   const maxAmount = Number(availableBalance) || 0;
 
   function handleSetMax() {
-    // Leave a small buffer for gas if needed, or fill total
-    setAmount(availableBalance);
+    // Leave a small buffer (0.002 USDC) for native gas fee on Arc Testnet
+    const maxVal = Math.max(0, maxAmount - 0.002);
+    setAmount(maxVal > 0 ? maxVal.toFixed(4) : availableBalance);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -73,9 +74,9 @@ export function WithdrawModal({
         }),
       });
 
-      const challengeData = await challengeRes.json();
-      if (!challengeRes.ok || challengeData.status === "error") {
-        toast.error(challengeData.message ?? "Failed to start withdrawal.");
+      const challengeData = await challengeRes.json().catch(() => null);
+      if (!challengeRes.ok || !challengeData || challengeData.status === "error") {
+        toast.error(challengeData?.message ?? "Failed to start withdrawal. Please try again.");
         return;
       }
 
@@ -99,9 +100,9 @@ export function WithdrawModal({
         }),
       });
 
-      const confirmData = await confirmRes.json();
-      if (!confirmRes.ok || confirmData.status === "error") {
-        toast.error(confirmData.message ?? "Failed to confirm withdrawal record.");
+      const confirmData = await confirmRes.json().catch(() => null);
+      if (!confirmRes.ok || !confirmData || confirmData.status === "error") {
+        toast.error(confirmData?.message ?? "Failed to confirm withdrawal record.");
       } else {
         toast.success(`Withdrew ${amount} USDC successfully!`);
       }
@@ -110,8 +111,13 @@ export function WithdrawModal({
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Withdrawal error:", error);
+      const isNetworkErr = error instanceof TypeError && error.message.toLowerCase().includes("fetch");
       toast.error(
-        error instanceof Error ? error.message : "Withdrawal failed. Please try again.",
+        isNetworkErr
+          ? "Network connection interrupted. Please try again in a moment."
+          : error instanceof Error
+            ? error.message
+            : "Withdrawal failed. Please try again.",
       );
     } finally {
       setIsSubmitting(false);
