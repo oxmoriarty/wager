@@ -1,45 +1,44 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """
-Wager — Settlement Intelligent Contract.
+Wager - Settlement Intelligent Contract.
 
-Responsibilities (PROJECT.md §6):
+Responsibilities (PROJECT.md Section 6):
   - Verify match results from multiple trusted sources
   - Compare trusted sources for agreement
   - Produce settlement decisions with confidence scoring
   - Refuse uncertain settlement (confidence < 0.8)
 
-Per PROJECT.md §6's governing principle, this contract owns the
+Per PROJECT.md Section 6's governing principle, this contract owns the
 non-deterministic reasoning involved in adjudicating a finished
 match's outcome (fetching trusted sources, extracting results via LLM,
 computing confidence from source agreement). Wager's backend only ever
 reads the validated settlement decision below and relays it to the Arc
-Escrow contract — it never independently decides what a market's
+Escrow contract - it never independently decides what a market's
 outcome is.
 
 Settlement model: Draw No Bet.
-  - Home win  → SUPPORT  (home-side stakers win the pot)
-  - Away win  → CHALLENGE (away-side stakers win the pot)
-  - Draw      → VOID     (all stakers get a full refund)
+  - Home win  -> SUPPORT  (home-side stakers win the pot)
+  - Away win  -> CHALLENGE (away-side stakers win the pot)
+  - Draw      -> VOID     (all stakers get a full refund)
 
-Edge cases (PROJECT.md §6):
-  - Postponed/Abandoned/Canceled/Suspended → VOID
-  - Extra time / penalties → ignored; MATCH_RESULT is decided on the
+Edge cases (PROJECT.md Section 6):
+  - Postponed/Abandoned/Canceled/Suspended -> VOID
+  - Extra time / penalties -> ignored; MATCH_RESULT is decided on the
     full-time score (90 min + stoppage time) only
-  - Conflicting sources → confidence drops below threshold → VOID
+  - Conflicting sources -> confidence drops below threshold -> VOID
 
 Deployment target: GenLayer Bradbury Testnet.
 """
 
 from genlayer import *
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import typing
 
 MATCH_RESULT = "MATCH_RESULT"
 
 # Settlement is accepted only if confidence meets this threshold.
 # Below this, the market is voided (full refund) rather than settled
-# with a potentially incorrect outcome. (PROJECT.md §6: "Refuse
+# with a potentially incorrect outcome. (PROJECT.md Section 6: "Refuse
 # uncertain settlement.")
 MIN_CONFIDENCE = 0.8
 
@@ -81,7 +80,7 @@ class Settlement(gl.Contract):
 
     # ------------------------------------------------------------------
     # Access control (identical pattern to FixtureDiscovery and
-    # MatchMonitoring — see those contracts for rationale)
+    # MatchMonitoring - see those contracts for rationale)
     # ------------------------------------------------------------------
 
     @gl.public.write
@@ -138,9 +137,9 @@ class Settlement(gl.Contract):
         from the fraction of sources that agree.
 
         Settlement model (Draw No Bet):
-          - Home win  → outcome "SUPPORT"
-          - Away win  → outcome "CHALLENGE"
-          - Draw      → outcome "VOID" (all stakers refunded)
+          - Home win  -> outcome "SUPPORT"
+          - Away win  -> outcome "CHALLENGE"
+          - Draw      -> outcome "VOID" (all stakers refunded)
 
         Matches that never finished normally (POSTPONED, SUSPENDED,
         ABANDONED, CANCELED) are immediately voided without fetching
@@ -165,7 +164,7 @@ class Settlement(gl.Contract):
                 "source_urls must not be empty for non-void settlements"
             )
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = gl.message_raw["datetime"]
 
         # --- Fast path: void-eligible statuses ---
         if match_status in VOID_STATUSES:
@@ -241,11 +240,11 @@ Respond using ONLY the following JSON format, nothing else:
                         except (TypeError, ValueError):
                             pass
                     elif confirmed:
-                        # LLM confirmed but didn't return scores — trust
+                        # LLM confirmed but didn't return scores - trust
                         # it only if the confirmation is explicit
                         agreeing += 1
                 except Exception:
-                    # Source unreachable or LLM error — skip this source,
+                    # Source unreachable or LLM error - skip this source,
                     # don't fail the entire settlement
                     pass
 
@@ -312,7 +311,7 @@ Respond using ONLY the following JSON format, nothing else:
                 return False
 
             # Outcome is an objective decision derived from an objective
-            # score — require exact match (same rationale as Match
+            # score - require exact match (same rationale as Match
             # Monitoring's exact-equality consensus).
             if my_result["outcome"] != leader_data["outcome"]:
                 return False

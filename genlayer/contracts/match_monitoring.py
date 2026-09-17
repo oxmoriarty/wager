@@ -1,17 +1,17 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """
-Wager — Match Monitoring Intelligent Contract.
+Wager - Match Monitoring Intelligent Contract.
 
-Responsibilities (PROJECT.md §6):
+Responsibilities (PROJECT.md Section 6):
   - Live score monitoring
   - Match state updates
   - Detect postponements (and suspensions/abandonments/cancellations)
 
-Per PROJECT.md §6's governing principle, this contract owns the
+Per PROJECT.md Section 6's governing principle, this contract owns the
 non-deterministic reasoning involved in checking a live match's current
 state (fetching a web source and extracting structured status/score data
 via an LLM). Wager's backend only ever reads the validated result below
-and syncs it into its own `Match` table — it never independently decides
+and syncs it into its own `Match` table - it never independently decides
 what a match's current score or status is.
 
 Deployment target: GenLayer Bradbury Testnet.
@@ -19,11 +19,10 @@ Deployment target: GenLayer Bradbury Testnet.
 
 from genlayer import *
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import typing
 
 # Mirrors Wager's Prisma `MatchStatus` enum (prisma/schema.prisma) exactly
-# — the backend sync layer maps these strings 1:1 onto that enum.
+# - the backend sync layer maps these strings 1:1 onto that enum.
 ALLOWED_STATUSES = {
     "SCHEDULED",
     "LIVE",
@@ -116,7 +115,7 @@ class MatchMonitoring(gl.Contract):
 
         Safe to call repeatedly for the same fixture as it progresses
         from SCHEDULED -> LIVE -> FINISHED (or into POSTPONED/SUSPENDED/
-        ABANDONED/CANCELED) — each call simply overwrites the stored
+        ABANDONED/CANCELED) - each call simply overwrites the stored
         state with the freshly observed one.
         """
         self._require_operator()
@@ -223,11 +222,11 @@ Respond using ONLY the following JSON format, nothing else:
                 my_result = leader_fn()
             except Exception:
                 # Validator itself couldn't extract a valid result either
-                # — treat as disagreement rather than propagating the
+                # - treat as disagreement rather than propagating the
                 # exception, so the network can rotate cleanly.
                 return False
 
-            # Status and score are objective facts, not free-form text —
+            # Status and score are objective facts, not free-form text -
             # unlike fixture discovery's fuzzy team-name matching, an
             # honest independent extraction should land on the exact
             # same tuple. Require exact equality.
@@ -239,7 +238,7 @@ Respond using ONLY the following JSON format, nothing else:
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = gl.message_raw["datetime"]
 
         if fixture_id not in self.matches:
             self.fixture_ids.append(fixture_id)

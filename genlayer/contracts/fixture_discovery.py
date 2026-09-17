@@ -1,24 +1,23 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """
-Wager — Fixture Discovery Intelligent Contract.
+Wager - Fixture Discovery Intelligent Contract.
 
-Responsibilities (PROJECT.md §6):
+Responsibilities (PROJECT.md Section 6):
   - Discover fixtures from a trusted source
   - Validate fixtures
   - Create canonical markets
 
-Per PROJECT.md §6's governing principle, this contract owns all
+Per PROJECT.md Section 6's governing principle, this contract owns all
 non-deterministic reasoning involved in fixture discovery (fetching a
 web source and extracting structured fixture data via an LLM). Wager's
 backend only ever reads the validated results below and syncs them into
-its own database — it never independently decides what a "fixture" is.
+its own database - it never independently decides what a "fixture" is.
 
 Deployment target: GenLayer Bradbury Testnet.
 """
 
 from genlayer import *
 from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import typing
 
@@ -176,7 +175,7 @@ Respond using ONLY the following JSON format, nothing else:
         result = json.loads(result_str)
 
         created_count = 0
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = gl.message_raw["datetime"]
 
         for raw in result["fixtures"]:
             home = str(raw.get("home_team", "")).strip()
