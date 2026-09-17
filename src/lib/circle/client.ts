@@ -181,8 +181,9 @@ export async function findStakeTransactionHash(params: {
   onChainMarketId: Hex;
   sideIndex: 0 | 1;
 }): Promise<string | null> {
+  const { userToken } = await createCircleUserToken(params.userId);
   const result = await getCircleClient().listTransactions({
-    userId: params.userId,
+    userToken,
     walletIds: [params.walletId],
     order: "DESC",
   });
@@ -253,8 +254,9 @@ export async function findClaimTransactionHash(params: {
   walletId: string;
   onChainMarketId: Hex;
 }): Promise<string | null> {
+  const { userToken } = await createCircleUserToken(params.userId);
   const result = await getCircleClient().listTransactions({
-    userId: params.userId,
+    userToken,
     walletIds: [params.walletId],
     order: "DESC",
   });
@@ -343,18 +345,22 @@ export async function findWithdrawTransactionHash(params: {
   walletId: string;
   destinationAddress: string;
 }): Promise<string | null> {
+  const { userToken } = await createCircleUserToken(params.userId);
   const result = await getCircleClient().listTransactions({
-    userId: params.userId,
+    userToken,
     walletIds: [params.walletId],
-    destinationAddress: params.destinationAddress,
     order: "DESC",
   });
 
   const transactions = result.data?.transactions ?? [];
+  const destLower = params.destinationAddress.toLowerCase();
 
   for (const tx of transactions) {
     if (!tx.txHash) continue;
-    if (tx.state !== "CONFIRMED" && tx.state !== "COMPLETE") continue;
+    if (tx.state === "FAILED" || tx.state === "CANCELLED") continue;
+    if (tx.destinationAddress && tx.destinationAddress.toLowerCase() !== destLower) {
+      continue;
+    }
     return tx.txHash;
   }
 
