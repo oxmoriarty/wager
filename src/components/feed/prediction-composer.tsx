@@ -125,12 +125,24 @@ export function PredictionComposer({
           ...challengeBody.data,
         });
 
-        const confirmRes = await fetch("/api/wallet/stake-confirm", {
+        let confirmRes = await fetch("/api/wallet/stake-confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ marketId, side, amount: stakeAmount }),
         });
-        const confirmBody = await parseApiJson<{ amount: string }>(confirmRes);
+        let confirmBody = await parseApiJson<{ amount: string }>(confirmRes);
+
+        // If transaction is still confirming on Circle, wait 3s and retry once automatically
+        if (!confirmBody.success && confirmRes.status === 409) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          confirmRes = await fetch("/api/wallet/stake-confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ marketId, side, amount: stakeAmount }),
+          });
+          confirmBody = await parseApiJson<{ amount: string }>(confirmRes);
+        }
+
         if (!confirmBody.success) {
           toast.error(confirmBody.message);
           return;

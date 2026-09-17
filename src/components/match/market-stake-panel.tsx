@@ -112,14 +112,28 @@ export function MarketStakePanel({
         ...challengeBody.data,
       });
 
-      const confirmResponse = await fetch("/api/wallet/stake-confirm", {
+      let confirmResponse = await fetch("/api/wallet/stake-confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marketId, side, amount }),
       });
-      const confirmBody = await parseApiResponse<{ amount: string }>(
+      let confirmBody = await parseApiResponse<{ amount: string }>(
         confirmResponse,
       );
+
+      // If transaction is still confirming on Circle, wait 3s and retry once automatically
+      if (!confirmBody.success && confirmResponse.status === 409) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        confirmResponse = await fetch("/api/wallet/stake-confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marketId, side, amount }),
+        });
+        confirmBody = await parseApiResponse<{ amount: string }>(
+          confirmResponse,
+        );
+      }
+
       if (!confirmBody.success) {
         toast.error(confirmBody.message);
         return;

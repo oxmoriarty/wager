@@ -67,9 +67,9 @@ export async function POST(request: Request) {
   const sideIndex = CONTRACT_SIDE[side];
 
   try {
-    // Retry finding the transaction from Circle (up to 5 attempts, 1.5s delay)
+    // Retry finding the transaction from Circle (up to 8 attempts, 2s delay = 16s)
     let txHash: string | null = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       txHash = await findStakeTransactionHash({
         userId,
         walletId: user.circleWalletId,
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         sideIndex,
       });
       if (txHash) break;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     if (!txHash) {

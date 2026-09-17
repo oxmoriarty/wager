@@ -198,17 +198,25 @@ export async function findStakeTransactionHash(params: {
     const target = (tx.contractAddress || tx.destinationAddress || "").toLowerCase();
     if (target && target !== escrowAddress) continue;
 
-    if (tx.abiFunctionSignature !== "stake(bytes32,uint8)") continue;
-
-    const [marketIdParam, sideParam] = tx.abiParameters ?? [];
-    const matchesMarket =
-      typeof marketIdParam === "string" &&
-      marketIdParam.toLowerCase() === params.onChainMarketId.toLowerCase();
-    const matchesSide = String(sideParam) === String(params.sideIndex);
-
-    if (matchesMarket && matchesSide) {
-      return tx.txHash;
+    if (tx.abiFunctionSignature) {
+      const cleanSig = tx.abiFunctionSignature.replace(/\s+/g, "").toLowerCase();
+      if (!cleanSig.includes("stake")) continue;
     }
+
+    if (tx.abiParameters && Array.isArray(tx.abiParameters) && tx.abiParameters.length > 0) {
+      const p0 = String(tx.abiParameters[0] ?? "").toLowerCase();
+      if (p0.startsWith("0x") && p0 !== params.onChainMarketId.toLowerCase()) {
+        continue;
+      }
+      if (tx.abiParameters.length > 1) {
+        const p1 = String(tx.abiParameters[1] ?? "");
+        if (p1 !== String(params.sideIndex)) {
+          continue;
+        }
+      }
+    }
+
+    return tx.txHash;
   }
 
   return null;
@@ -271,16 +279,19 @@ export async function findClaimTransactionHash(params: {
     const target = (tx.contractAddress || tx.destinationAddress || "").toLowerCase();
     if (target && target !== escrowAddress) continue;
 
-    if (tx.abiFunctionSignature !== "claim(bytes32)") continue;
-
-    const [marketIdParam] = tx.abiParameters ?? [];
-    const matchesMarket =
-      typeof marketIdParam === "string" &&
-      marketIdParam.toLowerCase() === params.onChainMarketId.toLowerCase();
-
-    if (matchesMarket) {
-      return tx.txHash;
+    if (tx.abiFunctionSignature) {
+      const cleanSig = tx.abiFunctionSignature.replace(/\s+/g, "").toLowerCase();
+      if (!cleanSig.includes("claim")) continue;
     }
+
+    if (tx.abiParameters && Array.isArray(tx.abiParameters) && tx.abiParameters.length > 0) {
+      const p0 = String(tx.abiParameters[0] ?? "").toLowerCase();
+      if (p0.startsWith("0x") && p0 !== params.onChainMarketId.toLowerCase()) {
+        continue;
+      }
+    }
+
+    return tx.txHash;
   }
 
   return null;
