@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { signUpSchema } from "@/lib/validation/auth";
 import { generateUniqueUsername } from "@/lib/username";
+import { createOtpToken } from "@/lib/auth-token";
+import { sendVerificationEmail } from "@/lib/email/mailer";
 
 const PASSWORD_SALT_ROUNDS = 12;
 
@@ -61,11 +63,19 @@ export async function POST(request: Request) {
       },
     });
 
-    return apiSuccess(user, "Account created.", 201);
+    // Generate 6-digit OTP code and send verification email
+    const otpCode = await createOtpToken(normalizedEmail, "EMAIL_VERIFICATION");
+    await sendVerificationEmail(normalizedEmail, otpCode);
+
+    return apiSuccess(
+      {
+        ...user,
+        requiresVerification: true,
+      },
+      "Account created. We sent a 6-digit verification code to your email.",
+      201,
+    );
   } catch (error) {
-    // Unique constraint race (email or generated username taken between
-    // the check above and the insert) — ask the client to retry rather
-    // than leaking the raw database error.
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"

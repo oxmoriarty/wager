@@ -43,6 +43,30 @@ export function SignInForm() {
       });
 
       if (result?.error) {
+        // Check if the account exists but has an unverified email
+        try {
+          const statusRes = await fetch("/api/auth/check-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: parsed.data.email }),
+          });
+          const statusData = await statusRes.json();
+          if (statusData?.data?.unverified) {
+            toast.error("Please verify your email before signing in.", {
+              action: {
+                label: "Verify email",
+                onClick: () =>
+                  router.push(
+                    `/verify-email?email=${encodeURIComponent(parsed.data.email)}`,
+                  ),
+              },
+            });
+            return;
+          }
+        } catch {
+          // Ignore status check errors and fall back to general error
+        }
+
         toast.error("Incorrect email or password.");
         return;
       }
@@ -77,7 +101,15 @@ export function SignInForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <a
+            href="/forgot-password"
+            className="text-xs text-white/70 hover:text-white transition-colors"
+          >
+            Forgot password?
+          </a>
+        </div>
         <Input
           id="password"
           name="password"

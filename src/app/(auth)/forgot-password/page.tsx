@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { SignUpForm } from "@/components/auth/sign-up-form";
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 
-export const metadata: Metadata = { title: "Sign up" };
+export const metadata: Metadata = { title: "Forgot password" };
 
-export default function SignUpPage() {
+export default function ForgotPasswordPage() {
   return (
     <AuthCard
-      title="Create your account"
-      description="Every post is a prediction."
+      title="Reset your password"
+      description="Enter your email address and we'll send you a 6-digit code to reset your password."
       footer={
         <>
-          Already have an account?{" "}
+          Remembered your password?{" "}
           <Link
             href="/sign-in"
             className="text-white hover:text-white/80 font-medium underline underline-offset-4"
@@ -23,7 +23,7 @@ export default function SignUpPage() {
         </>
       }
     >
-      <SignUpForm />
+      <ForgotPasswordForm />
     </AuthCard>
   );
 }
